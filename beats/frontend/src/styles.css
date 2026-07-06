@@ -1,0 +1,229 @@
+/*
+ * Beat Share - styled to match the platform's shared "improved Windows XP"
+ * theme. The shared design tokens (--face, --accent, spacing, etc.) come from
+ * /shared/xp.css, which index.html links alongside this bundle.
+ */
+
+#root {
+  height: 100vh;
+}
+
+.boot-screen {
+  height: 100vh;
+  background: var(--desktop, #245edb);
+}
+
+/* ---- Window layout ---- */
+.beats {
+  height: 100vh;
+}
+.beats .beats-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-4, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4, 12px);
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.menubar-right {
+  margin-left: auto;
+  padding-right: var(--sp-2, 6px);
+}
+.hub-link {
+  color: #fff;
+  border-color: #6a8ec8;
+}
+
+/* ---- Upload panel ---- */
+.upload-panel .field { margin-bottom: var(--sp-3, 8px); }
+.upload-panel textarea { resize: vertical; }
+
+.dropzone {
+  border: 2px dashed var(--face-dark, #808080);
+  background: var(--field-bg, #fff);
+  padding: 16px 12px;
+  text-align: center;
+  cursor: default;
+  margin-bottom: var(--sp-3, 8px);
+  color: #303030;
+  font-size: 11px;
+}
+.dropzone.has-file {
+  border-style: solid;
+  border-color: var(--accent, #000080);
+  color: #000;
+}
+
+.progress {
+  border: 1px inset var(--face, #c0c0c0);
+  background: var(--field-bg, #fff);
+  height: 18px;
+  position: relative;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: repeating-linear-gradient(90deg, #0a246a, #0a246a 8px, #1b3f9c 8px, #1b3f9c 16px);
+  transition: width 0.15s;
+}
+
+.checkline {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 6px);
+  font-size: 11px;
+}
+
+/* ---- Track list ---- */
+.library .track-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2, 6px);
+}
+
+.track-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3, 8px);
+  padding: var(--sp-3, 8px);
+  background: var(--face-light, #dfdfdf);
+  border: 1px solid var(--face-dark, #808080);
+  cursor: default;
+}
+.track-row.current {
+  outline: 2px solid var(--accent, #000080);
+  outline-offset: -2px;
+}
+
+.play-toggle {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: 2px outset var(--face, #c0c0c0);
+  background: var(--face, #c0c0c0);
+  color: #000080;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.play-toggle:active { border-style: inset; }
+
+.track-body { flex: 1; min-width: 0; }
+.track-top {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 6px);
+}
+.track-name {
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.badges { display: flex; gap: 4px; flex-shrink: 0; }
+.track-duration { margin-left: auto; color: #303030; flex-shrink: 0; }
+
+.track-desc {
+  font-size: 10px;
+  color: #303030;
+  margin: 3px 0;
+  white-space: pre-wrap;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.track-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 6px);
+  font-size: 10px;
+  color: #303030;
+  margin-top: 4px;
+}
+.uploader { display: inline-flex; align-items: center; gap: 4px; }
+.avatar {
+  width: 15px; height: 15px;
+  border-radius: 2px;
+  background: var(--avatar-color, #888);
+  color: #fff;
+  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0,0,0,.3);
+}
+.meta-dot { width: 3px; height: 3px; background: var(--face-dark, #808080); border-radius: 50%; }
+
+.share-btn { flex-shrink: 0; align-self: center; width: auto; }
+
+/* Waveform canvas */
+.track-body canvas { width: 100%; height: 34px; display: block; margin: 4px 0; }
+
+/* ---- Now playing bar ---- */
+.now-playing {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3, 8px);
+  padding: var(--sp-2, 6px) var(--sp-3, 8px);
+  background: var(--face, #c0c0c0);
+  border-top: 2px groove var(--face, #c0c0c0);
+}
+.np-cover { width: 34px; height: 34px; border: 1px solid #000; flex-shrink: 0; }
+.np-info { flex: 1; min-width: 0; }
+.np-name { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.np-seekbar {
+  height: 12px;
+  border: 1px inset var(--face, #c0c0c0);
+  background: var(--field-bg, #fff);
+  margin: 3px 0;
+  cursor: pointer;
+}
+.np-seek-fill { height: 100%; background: linear-gradient(90deg, #0a246a, #4a6ea9); }
+.np-times { display: flex; justify-content: space-between; font-size: 10px; color: #303030; }
+.np-wave { width: 120px; height: 30px; }
+.np-wave canvas { width: 100%; height: 100%; display: block; }
+.np-toggle {
+  width: 34px; height: 34px; flex-shrink: 0;
+  border: 2px outset var(--face, #c0c0c0);
+  background: var(--face, #c0c0c0);
+  color: #000080;
+  cursor: default;
+  display: flex; align-items: center; justify-content: center;
+}
+.np-toggle:active { border-style: inset; }
+
+@media (max-width: 560px) {
+  .np-wave { display: none; }
+}
+
+/* ---- Toasts ---- */
+.toast-stack {
+  position: fixed;
+  bottom: 70px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 200;
+}
+.toast {
+  background: var(--face, #c0c0c0);
+  border: 2px outset var(--face, #c0c0c0);
+  padding: 6px 12px;
+  font-size: 11px;
+  box-shadow: 2px 2px 5px rgba(0,0,0,.35);
+  max-width: 280px;
+}
+.toast-success { border-left: 4px solid #157a2b; }
+.toast-error { border-left: 4px solid var(--danger, #a80000); }

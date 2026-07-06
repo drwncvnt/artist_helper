@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Shared track - drwncvnt</title>
+<link rel="stylesheet" href="/shared/xp.css" />
+<script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
+<style>
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .listen { width: 420px; max-width: 100%; padding: 12px; }
+  .listen .body { padding: 16px; }
+  .listen h1 { font-size: 15px; margin: 0 0 2px; }
+  .listen .uploader { color: #303030; margin: 0 0 12px; }
+  .listen .desc {
+    white-space: pre-wrap;
+    border: 1px inset var(--face);
+    background: var(--field-bg);
+    padding: 8px;
+    margin: 12px 0;
+    max-height: 160px;
+    overflow: auto;
+  }
+  .listen audio { width: 100%; margin-top: 4px; }
+  .listen .err { color: var(--danger); }
+  .listen .foot { margin-top: 14px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="listen">
+  <div class="window">
+    <div class="titlebar">
+      <div class="titlebar-icon"></div>
+      <span class="titlebar-text">Shared track</span>
+    </div>
+    <div class="body">
+      <div id="content"><p class="hint">Loading…</p></div>
+    </div>
+    <div class="statusbar">
+      <span class="status-field" id="status">drwncvnt · beats</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const content = document.getElementById('content');
+  const statusEl = document.getElementById('status');
+
+  // The page is served at <mount>/listen/<token>; derive both from the URL so
+  // the tool stays agnostic of where the gateway mounts it.
+  const path = window.location.pathname;
+  const marker = '/listen/';
+  const idx = path.indexOf(marker);
+  const base = idx >= 0 ? path.slice(0, idx) : '';
+  const token = idx >= 0 ? decodeURIComponent(path.slice(idx + marker.length)) : '';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  }
+
+  if (!token) {
+    content.innerHTML = '<p class="err">Invalid link.</p>';
+    return;
+  }
+
+  fetch(`${base}/api/public/track?token=${encodeURIComponent(token)}`)
+    .then((r) => {
+      if (!r.ok) throw new Error(r.status === 404 ? 'This link has expired or is invalid.' : 'Could not load track.');
+      return r.json();
+    })
+    .then((t) => {
+      const title = t.title || t.id;
+      content.innerHTML =
+        `<h1>${esc(title)}</h1>` +
+        (t.uploader ? `<p class="uploader hint">shared by ${esc(t.uploader)}</p>` : '') +
+        (t.description ? `<div class="desc">${esc(t.description)}</div>` : '') +
+        `<audio controls preload="metadata" src="${base}/${esc(t.stream_path)}"></audio>` +
+        `<div class="foot hint">A private track shared with you via drwncvnt · beats</div>`;
+      statusEl.textContent = 'Ready.';
+    })
+    .catch((e) => {
+      content.innerHTML = `<p class="err">${esc(e.message)}</p>`;
+      statusEl.textContent = 'Error.';
+    });
+})();
+</script>
+</body>
+</html>

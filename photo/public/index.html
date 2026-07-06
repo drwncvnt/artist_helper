@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>drwncvnt.fx</title>
+<link rel="stylesheet" href="/shared/xp.css" />
+<script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+  <div class="titlebar">
+    <div class="titlebar-icon"></div>
+    <span class="titlebar-text">drwncvnt.fx</span>
+    <div class="titlebar-buttons">
+      <button class="win-btn" tabindex="-1">_</button>
+      <button class="win-btn" tabindex="-1">&#9633;</button>
+      <button class="win-btn win-btn-close" tabindex="-1">X</button>
+    </div>
+  </div>
+
+  <div class="menubar">
+    <span>File</span><span>Edit</span><span>View</span><span>Image</span><span>Colors</span><span>Help</span>
+    <a class="status-link" href="/" style="margin-left:auto;">&#8592; Hub</a>
+  </div>
+
+  <div class="modetabs">
+    <button class="modetab-btn active" data-mode="photo">Photo Editor</button>
+    <button class="modetab-btn" data-mode="vfx">Video Effects</button>
+    <button class="modetab-btn" data-mode="video">Audio Visualizer</button>
+  </div>
+
+  <header class="topbar" id="photoTopbar">
+    <label class="btn" for="fileInput">Open Photo</label>
+    <input id="fileInput" type="file" accept="image/*" hidden />
+    <button id="randomizeBtn" class="btn">Randomize</button>
+    <button id="resetBtn" class="btn">Reset</button>
+    <button id="downloadBtn" class="btn">Save PNG</button>
+  </header>
+
+  <main class="workspace" id="photoMode">
+    <div class="toolbox">
+      <div class="toolbox-grid">
+        <div class="tool-btn" title="Free-Form Select"></div>
+        <div class="tool-btn" title="Select"></div>
+        <div class="tool-btn" title="Eraser"></div>
+        <div class="tool-btn" title="Fill"></div>
+        <div class="tool-btn" title="Pick Color"></div>
+        <div class="tool-btn" title="Magnifier"></div>
+        <div class="tool-btn" title="Pencil"></div>
+        <div class="tool-btn" title="Brush"></div>
+        <div class="tool-btn" title="Airbrush"></div>
+        <div class="tool-btn" title="Text"></div>
+        <div class="tool-btn" title="Line"></div>
+        <div class="tool-btn" title="Curve"></div>
+        <div class="tool-btn" title="Rectangle"></div>
+        <div class="tool-btn" title="Polygon"></div>
+        <div class="tool-btn" title="Ellipse"></div>
+        <div class="tool-btn" title="Rounded Rectangle"></div>
+      </div>
+    </div>
+
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="glcanvas"></canvas>
+      <canvas id="sortcanvas" class="overlay-canvas hidden"></canvas>
+      <div id="dropHint" class="drop-hint">
+        <div>
+          <p>Drag an image here</p>
+          <p class="small">or click "Open Photo"</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="presets">
+        <button data-preset="vhs" class="preset-btn">VHS</button>
+        <button data-preset="crt" class="preset-btn">CRT</button>
+        <button data-preset="gameboy" class="preset-btn">Dither</button>
+        <button data-preset="glitch" class="preset-btn">Glitch</button>
+        <button data-preset="halftone" class="preset-btn">Halftone</button>
+        <button data-preset="cctv" class="preset-btn">CCTV</button>
+        <button data-preset="oscilloscope" class="preset-btn">Oscilloscope</button>
+        <button data-preset="deepfry" class="preset-btn">Deep Fry</button>
+        <button data-preset="ascii" class="preset-btn">ASCII</button>
+        <button data-preset="datamosh" class="preset-btn">Datamosh</button>
+        <button data-preset="clean" class="preset-btn">Clear</button>
+      </div>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="pixelateOn" /><span></span></label>
+          <span>Pixelate</span>
+        </div>
+        <div class="fx-controls">
+          <label>Block size<input type="range" id="pixelSize" min="1" max="40" step="1" value="1"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="ditherOn" /><span></span></label>
+          <span>Dithering</span>
+        </div>
+        <div class="fx-controls">
+          <label>Color levels<input type="range" id="ditherLevels" min="2" max="16" step="1" value="4"></label>
+          <label>Pattern strength<input type="range" id="ditherAmount" min="0" max="1" step="0.01" value="0.5"></label>
+          <label class="checkline"><input type="checkbox" id="ditherMono"> Monochrome</label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="crtOn" /><span></span></label>
+          <span>CRT</span>
+        </div>
+        <div class="fx-controls">
+          <label>Scanlines<input type="range" id="crtScanline" min="0" max="1" step="0.01" value="0.4"></label>
+          <label>Screen curvature<input type="range" id="crtCurvature" min="0" max="1" step="0.01" value="0.25"></label>
+          <label>Color shift (RGB)<input type="range" id="crtShift" min="0" max="1" step="0.01" value="0.3"></label>
+          <label>Vignette<input type="range" id="crtVignette" min="0" max="1" step="0.01" value="0.5"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="vhsOn" /><span></span></label>
+          <span>VHS</span>
+        </div>
+        <div class="fx-controls">
+          <label>Line jitter<input type="range" id="vhsJitter" min="0" max="1" step="0.01" value="0.35"></label>
+          <label>Color bleed<input type="range" id="vhsBleed" min="0" max="1" step="0.01" value="0.4"></label>
+          <label>Tracking band<input type="range" id="vhsTracking" min="0" max="1" step="0.01" value="0.3"></label>
+          <label>Saturation<input type="range" id="vhsSaturation" min="0" max="1" step="0.01" value="0.7"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="glitchOn" /><span></span></label>
+          <span>Glitch (line shift)</span>
+        </div>
+        <div class="fx-controls">
+          <label>Amount<input type="range" id="glitchAmount" min="0" max="1" step="0.01" value="0.4"></label>
+          <label>Block size<input type="range" id="glitchBlock" min="0.01" max="0.3" step="0.01" value="0.08"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="blockOn" /><span></span></label>
+          <span>Block Corruption (JPEG)</span>
+        </div>
+        <div class="fx-controls">
+          <label>Amount<input type="range" id="blockAmount" min="0" max="1" step="0.01" value="0.5"></label>
+          <label>Macroblock size<input type="range" id="blockSize" min="2" max="40" step="1" value="12"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="rgbSplitOn" /><span></span></label>
+          <span>RGB Split</span>
+        </div>
+        <div class="fx-controls">
+          <label>Channel offset<input type="range" id="rgbSplitAmount" min="0" max="1" step="0.01" value="0.4"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="posterizeOn" /><span></span></label>
+          <span>Posterize</span>
+        </div>
+        <div class="fx-controls">
+          <label>Color levels<input type="range" id="posterizeLevels" min="2" max="16" step="1" value="4"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="fisheyeOn" /><span></span></label>
+          <span>Fisheye / CCTV</span>
+        </div>
+        <div class="fx-controls">
+          <label>Amount<input type="range" id="fisheyeAmount" min="0" max="1" step="0.01" value="0.5"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="lightLeakOn" /><span></span></label>
+          <span>Light Leaks</span>
+        </div>
+        <div class="fx-controls">
+          <label>Amount<input type="range" id="lightLeakAmount" min="0" max="1" step="0.01" value="0.5"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="bloomOn" /><span></span></label>
+          <span>Bloom / Glow</span>
+        </div>
+        <div class="fx-controls">
+          <label>Brightness threshold<input type="range" id="bloomThreshold" min="0" max="1" step="0.01" value="0.6"></label>
+          <label>Glow amount<input type="range" id="bloomAmount" min="0" max="1" step="0.01" value="0.5"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="oscOn" /><span></span></label>
+          <span>Oscilloscope</span>
+        </div>
+        <div class="fx-controls">
+          <label>Line thickness<input type="range" id="oscThickness" min="0" max="1" step="0.01" value="0.5"></label>
+          <label>Color<input type="color" id="oscColor" value="#39ff6a"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="halftoneOn" /><span></span></label>
+          <span>Halftone</span>
+        </div>
+        <div class="fx-controls">
+          <label>Dot size<input type="range" id="halftoneSize" min="2" max="30" step="1" value="8"></label>
+          <label>Angle<input type="range" id="halftoneAngle" min="0" max="90" step="1" value="15"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="duotoneOn" /><span></span></label>
+          <span>Duotone</span>
+        </div>
+        <div class="fx-controls">
+          <label>Shadow<input type="color" id="duotoneShadow" value="#1a0b2e"></label>
+          <label>Highlight<input type="color" id="duotoneHighlight" value="#ff7ac6"></label>
+          <label>Mix<input type="range" id="duotoneMix" min="0" max="1" step="0.01" value="1"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="grainOn" /><span></span></label>
+          <span>Grain</span>
+        </div>
+        <div class="fx-controls">
+          <label>Amount<input type="range" id="grainAmount" min="0" max="1" step="0.01" value="0.25"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="vignetteOn" /><span></span></label>
+          <span>Vignette (standalone)</span>
+        </div>
+        <div class="fx-controls">
+          <label>Amount<input type="range" id="vignetteAmount" min="0" max="1" step="0.01" value="0.4"></label>
+        </div>
+      </section>
+
+      <div class="panel-divider">Batch 2</div>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="deepFryOn" /><span></span></label>
+          <span>Deep Fryer</span>
+        </div>
+        <div class="fx-controls">
+          <label>Fry amount<input type="range" id="deepFryAmount" min="0" max="1" step="0.01" value="0.6"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="asciiOn" /><span></span></label>
+          <span>ASCII Art</span>
+        </div>
+        <div class="fx-controls">
+          <label>Character size<input type="range" id="asciiCellSize" min="4" max="24" step="1" value="9"></label>
+          <label class="checkline"><input type="checkbox" id="asciiColorMode"> Color (not terminal)</label>
+          <label>Terminal color<input type="color" id="asciiTermColor" value="#39ff6a"></label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <label class="switch"><input type="checkbox" id="datamoshOn" /><span></span></label>
+          <span>Datamosh (I-frame destruction)</span>
+        </div>
+        <div class="fx-controls">
+          <label>Effect amount<input type="range" id="datamoshAmount" min="0" max="1" step="0.01" value="0.75"></label>
+          <label>Drift speed<input type="range" id="datamoshDrift" min="0" max="1" step="0.01" value="0.4"></label>
+          <label>Keyframe rate<input type="range" id="datamoshKeyframe" min="0" max="0.3" step="0.005" value="0.02"></label>
+          <button id="datamoshResetBtn" class="btn small">Reset trail</button>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <span>Pixel Sorting</span>
+        </div>
+        <div class="fx-controls">
+          <label>Direction
+            <select id="sortDirection">
+              <option value="vertical">Vertical</option>
+              <option value="horizontal">Horizontal</option>
+            </select>
+          </label>
+          <label>Brightness threshold<input type="range" id="sortThreshold" min="0" max="1" step="0.01" value="0.5"></label>
+          <label>Range
+            <select id="sortMode">
+              <option value="above">Sort bright</option>
+              <option value="below">Sort dark</option>
+            </select>
+          </label>
+          <button id="sortApplyBtn" class="btn small">Apply Sort</button>
+          <button id="sortClearBtn" class="btn small">Clear Result</button>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <span>Audio-Reactive</span>
+        </div>
+        <div class="fx-controls">
+          <label class="btn ghost-file" for="audioInput">Load Track</label>
+          <input id="audioInput" type="file" accept="audio/*" hidden />
+          <div class="audio-transport">
+            <button id="audioPlayBtn" class="btn small" disabled>Play</button>
+            <button id="audioStopBtn" class="btn small" disabled>Stop</button>
+          </div>
+          <label class="checkline"><input type="checkbox" id="audioReactOn"> React to track</label>
+          <label>Sensitivity<input type="range" id="audioSensitivity" min="0" max="1" step="0.01" value="0.6"></label>
+          <p class="small hint">Modulates Glitch (bass), RGB Split (treble), Bloom (mid)</p>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <main class="workspace hidden" id="videoMode">
+    <div class="canvas-wrap" id="videoCanvasWrap">
+      <canvas id="videoCanvas"></canvas>
+    </div>
+
+    <aside class="panel">
+      <section class="fx-group">
+        <div class="fx-header">
+          <span>Audio Track</span>
+        </div>
+        <div class="fx-controls">
+          <label class="btn ghost-file" for="videoAudioInput">Load Audio Track</label>
+          <input id="videoAudioInput" type="file" accept="audio/*" hidden />
+          <div class="audio-transport">
+            <button id="videoPreviewPlayBtn" class="btn small" disabled>Preview</button>
+            <button id="videoPreviewStopBtn" class="btn small" disabled>Stop</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <span>Output Aspect Ratio</span>
+        </div>
+        <div class="fx-controls">
+          <div class="presets">
+            <button class="aspect-btn preset-btn" data-aspect="1:1">1:1</button>
+            <button class="aspect-btn preset-btn" data-aspect="4:3">4:3</button>
+            <button class="aspect-btn preset-btn" data-aspect="16:9">16:9</button>
+            <button class="aspect-btn preset-btn" data-aspect="9:16">9:16</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <span>Visualizer Layers</span>
+        </div>
+        <div class="fx-controls">
+          <label class="checkline"><input type="checkbox" id="particlesOn"> Particles</label>
+          <label class="checkline"><input type="checkbox" id="glowOn"> Glow</label>
+          <label class="checkline"><input type="checkbox" id="colorCycleOn"> Color Cycle</label>
+          <label class="checkline"><input type="checkbox" id="scanlinesOn"> Scanlines</label>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <span>Render</span>
+        </div>
+        <div class="fx-controls">
+          <button id="videoRenderBtn" class="btn small" disabled>Render &amp; Download Music Video</button>
+          <p class="small hint" id="videoStatus">Load an audio track to begin.</p>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <main class="workspace hidden" id="vfxMode">
+    <div class="canvas-wrap" id="vfxCanvasWrap">
+      <canvas id="vfxCanvas"></canvas>
+      <div id="vfxDropHint" class="drop-hint">
+        <div>
+          <p>Load a video to begin</p>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <section class="fx-group">
+        <div class="fx-header">
+          <span>Source Video</span>
+        </div>
+        <div class="fx-controls">
+          <label class="btn ghost-file" for="vfxVideoInput">Load Video</label>
+          <input id="vfxVideoInput" type="file" accept="video/*" hidden />
+          <div class="audio-transport">
+            <button id="vfxPlayBtn" class="btn small" disabled>Play</button>
+            <button id="vfxPauseBtn" class="btn small" disabled>Pause</button>
+          </div>
+          <label class="checkline"><input type="checkbox" id="vfxAudioReactOn" disabled> React to audio</label>
+          <label>Sensitivity<input type="range" id="vfxAudioSensitivity" min="0" max="1" step="0.01" value="0.6"></label>
+          <p class="small hint" id="vfxAudioNote">No video loaded.</p>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <span>Custom Audio Track</span>
+        </div>
+        <div class="fx-controls">
+          <label class="btn ghost-file" for="vfxCustomAudioInput">Load Custom Audio</label>
+          <input id="vfxCustomAudioInput" type="file" accept="audio/*" hidden />
+          <button id="vfxRemoveCustomAudioBtn" class="btn small" disabled>Remove, Use Original</button>
+          <p class="small hint" id="vfxCustomAudioNote">None loaded - export keeps the video's own audio.</p>
+        </div>
+      </section>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <span>Output Aspect Ratio</span>
+        </div>
+        <div class="fx-controls">
+          <div class="presets">
+            <button class="vfx-aspect-btn preset-btn" data-aspect="1:1">1:1</button>
+            <button class="vfx-aspect-btn preset-btn" data-aspect="4:3">4:3</button>
+            <button class="vfx-aspect-btn preset-btn" data-aspect="16:9">16:9</button>
+            <button class="vfx-aspect-btn preset-btn" data-aspect="9:16">9:16</button>
+          </div>
+        </div>
+      </section>
+
+      <div id="vfxEffectsContainer"></div>
+
+      <section class="fx-group">
+        <div class="fx-header">
+          <span>Render</span>
+        </div>
+        <div class="fx-controls">
+          <button id="vfxRenderBtn" class="btn small" disabled>Render &amp; Download Video</button>
+          <p class="small hint" id="vfxStatus">Load a video to begin.</p>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <div class="statusbar">
+    <span id="statusText">For Help, click Help Topics on the Help Menu.</span>
+    <a class="status-link" href="https://github.com/drwncvnt/drwncvntfx" target="_blank" rel="noopener">github.com/drwncvnt/drwncvntfx</a>
+  </div>
+</div>
+
+<script src="shaders.js"></script>
+<script src="app.js"></script>
+<script src="video-common.js"></script>
+<script src="video-shader.js"></script>
+<script src="video.js"></script>
+<script src="video-effects.js"></script>
+<script>
+(() => {
+  const tabs = document.querySelectorAll('.modetab-btn');
+  const photoTopbar = document.getElementById('photoTopbar');
+  const modes = {
+    photo: document.getElementById('photoMode'),
+    video: document.getElementById('videoMode'),
+    vfx: document.getElementById('vfxMode'),
+  };
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.classList.toggle('active', t === tab));
+      const active = tab.dataset.mode;
+      photoTopbar.classList.toggle('hidden', active !== 'photo');
+      Object.keys(modes).forEach((key) => {
+        modes[key].classList.toggle('hidden', key !== active);
+      });
+    });
+  });
+  const modeParam = new URLSearchParams(location.search).get('mode');
+  if (modeParam === 'video' || modeParam === 'vfx') {
+    document.querySelector('.modetab-btn[data-mode="' + modeParam + '"]').click();
+  }
+})();
+</script>
+</body>
+</html>

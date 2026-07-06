@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Artist Helper</title>
+<link rel="stylesheet" href="/shared/xp.css" />
+<script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
+</head>
+<body>
+<div class="window window--full">
+  <div class="titlebar">
+    <div class="titlebar-icon"></div>
+    <span class="titlebar-text">Artist Helper</span>
+    <div class="titlebar-buttons">
+      <button class="win-btn" tabindex="-1">_</button>
+      <button class="win-btn" tabindex="-1">&#9633;</button>
+      <button class="win-btn win-btn-close" tabindex="-1">X</button>
+    </div>
+  </div>
+
+  <div class="menubar">
+    <span>File</span><span>View</span><span id="helpMenuItem" role="button" tabindex="0">Help</span>
+    <div class="auth-status" id="authStatus"></div>
+  </div>
+
+  <div class="hub">
+    <h1 style="font-size:16px; margin:8px 0 2px;">Tools for artists</h1>
+    <p class="hint" style="margin-bottom:8px;">Pick a tool to get started. Your account works across all of them. <span style="color:#303030;">by drwncvnt</span></p>
+    <div class="groupbox">
+      <div class="hub-grid" id="hubGrid"></div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span class="status-field" id="statusText">Ready.</span>
+    <a class="status-link" href="https://github.com/drwncvnt/artist_helper" target="_blank" rel="noopener">
+      open source - github.com/drwncvnt/artist_helper
+    </a>
+  </div>
+</div>
+
+<div class="dialog-overlay hidden" id="feedbackDialog">
+  <div class="dialog window">
+    <div class="titlebar">
+      <div class="titlebar-icon"></div>
+      <span class="titlebar-text">Feedback &amp; bug reports</span>
+      <div class="titlebar-buttons">
+        <button class="win-btn win-btn-close" id="feedbackCloseBtn" tabindex="-1">X</button>
+      </div>
+    </div>
+    <div class="dialog-body">
+      <form id="feedbackForm">
+        <p class="dialog-error" id="feedbackError"></p>
+        <div class="field">
+          <label class="field-label" for="feedbackType">Type</label>
+          <select id="feedbackType">
+            <option value="feedback">General feedback</option>
+            <option value="bug">Bug report</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label" for="feedbackMessage">Message</label>
+          <textarea id="feedbackMessage" rows="6" maxlength="5000"
+            placeholder="What's on your mind? For bugs, include what you did and what went wrong." required></textarea>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn" id="feedbackCancelBtn">Cancel</button>
+          <button type="submit" class="btn primary" id="feedbackSubmitBtn">Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const authStatus = document.getElementById('authStatus');
+  const hubGrid = document.getElementById('hubGrid');
+  const statusText = document.getElementById('statusText');
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  }
+
+  function renderUser(user) {
+    authStatus.innerHTML = '';
+    const name = document.createElement('span');
+    name.textContent = user.username;
+    const plan = document.createElement('span');
+    plan.className = 'badge' + (user.plan === 'pro' ? ' badge-pro' : '');
+    plan.textContent = user.plan;
+    const upgrade = document.createElement('button');
+    upgrade.className = 'btn small';
+    upgrade.textContent = 'Upgrade - Soon';
+    upgrade.disabled = true;
+    upgrade.title = 'Subscriptions are coming soon.';
+    const out = document.createElement('button');
+    out.className = 'btn small';
+    out.textContent = 'Sign out';
+    out.addEventListener('click', logout);
+    authStatus.append(name, plan, upgrade, out);
+  }
+
+  function renderTiles(tools) {
+    hubGrid.innerHTML = '';
+    tools.forEach((t) => {
+      const enabled = t.enabled;
+      const tile = document.createElement(enabled ? 'a' : 'div');
+      tile.className = 'tile' + (enabled ? '' : ' tile-disabled');
+      if (enabled) tile.href = '/' + t.slug + '/';
+      tile.innerHTML =
+        '<div class="tile-icon">' + t.icon + '</div>' +
+        '<div class="tile-name">' + t.name + '</div>' +
+        '<div class="tile-desc">' + (enabled ? t.desc : 'Soon') + '</div>';
+      hubGrid.appendChild(tile);
+    });
+    const live = tools.filter((t) => t.enabled).length;
+    statusText.textContent = live + ' tool' + (live === 1 ? '' : 's') + ' available.';
+  }
+
+  Promise.all([
+    fetch('/api/auth/me').then((r) => r.json()),
+    fetch('/api/tools').then((r) => r.json()),
+  ]).then(([me, reg]) => {
+    if (!me.user) { window.location.href = '/login'; return; }
+    renderUser(me.user);
+    renderTiles(reg.tools);
+  }).catch(() => {
+    statusText.textContent = 'Failed to load. Refresh to retry.';
+  });
+
+  // ---- Help > Feedback / bug report dialog ----
+  const helpMenuItem = document.getElementById('helpMenuItem');
+  const feedbackDialog = document.getElementById('feedbackDialog');
+  const feedbackForm = document.getElementById('feedbackForm');
+  const feedbackError = document.getElementById('feedbackError');
+  const feedbackMessage = document.getElementById('feedbackMessage');
+  const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
+
+  function openFeedback() {
+    feedbackError.textContent = '';
+    feedbackForm.reset();
+    feedbackDialog.classList.remove('hidden');
+    feedbackMessage.focus();
+  }
+  function closeFeedback() {
+    feedbackDialog.classList.add('hidden');
+  }
+
+  helpMenuItem.addEventListener('click', openFeedback);
+  helpMenuItem.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFeedback(); }
+  });
+  document.getElementById('feedbackCloseBtn').addEventListener('click', closeFeedback);
+  document.getElementById('feedbackCancelBtn').addEventListener('click', closeFeedback);
+  feedbackDialog.addEventListener('click', (e) => {
+    if (e.target === feedbackDialog) closeFeedback();
+  });
+
+  feedbackForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    feedbackError.textContent = '';
+    feedbackSubmitBtn.disabled = true;
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: document.getElementById('feedbackType').value,
+          message: feedbackMessage.value,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        feedbackError.textContent = data.error || 'Could not send. Please try again.';
+        return;
+      }
+      statusText.textContent = 'Thanks - your message was sent.';
+      closeFeedback();
+    } catch {
+      feedbackError.textContent = 'Network error. Please try again.';
+    } finally {
+      feedbackSubmitBtn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+# drwncvnt platform - one login, many tools.
+#
+# Only the gateway is published to the host. Everything else (accounts, the
+# database, and each tool) talks over the internal Docker network and is never
+# reachable from outside, so the gateway's session gate is the single front door.
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: dp_db
+    environment:
+      POSTGRES_DB: drwncvnt
+      POSTGRES_USER: drwncvnt
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drwncvnt"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  accounts:
+    build: ./accounts
+    container_name: dp_accounts
+    environment:
+      DATABASE_URL: postgres://drwncvnt:${POSTGRES_PASSWORD}@db:5432/drwncvnt
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-dp_session}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-2592000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  photo:
+    build: ./photo
+    container_name: dp_photo
+    restart: unless-stopped
+
+  promo:
+    build: ./promo
+    container_name: dp_promo
+    restart: unless-stopped
+
+  midi:
+    build: ./midi
+    container_name: dp_midi
+    restart: unless-stopped
+
+  beats:
+    build: ./beats
+    container_name: dp_beats
+    environment:
+      SIGNING_SECRET: ${SIGNING_SECRET:?set SIGNING_SECRET in .env}
+      STORAGE_DIR: /data/storage
+      DB_DIR: /data/db
+      MAX_UPLOAD_MB: ${BEATS_MAX_UPLOAD_MB:-200}
+    volumes:
+      - beats-storage:/data/storage
+      - beats-db:/data/db
+    restart: unless-stopped
+
+  gateway:
+    build: ./gateway
+    container_name: dp_gateway
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-dp_session}
+      ACCOUNTS_URL: http://accounts:4100
+      # A tool becomes available (and gets a live hub tile) only when its URL is
+      # set here. Comment a line out to show that tool as "Soon" instead.
+      PHOTO_URL: http://photo:80
+      PROMO_URL: http://promo:5002
+      MIDI_URL: http://midi:11000
+      BEATS_URL: http://beats:8000
+    volumes:
+      - ./shared:/app/shared:ro
+      - ./feedback:/app/feedback
+    depends_on:
+      - accounts
+      - photo
+      - promo
+      - midi
+      - beats
+    ports:
+      - "${GATEWAY_PORT:-4000}:4000"
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  beats-storage:
+  beats-db:

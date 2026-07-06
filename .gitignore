@@ -1,0 +1,17 @@
+# Secrets - never commit
+.env
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+*.log
+
+# Local data volumes (if bind-mounted during dev)
+data/
+
+# User-submitted feedback/bug reports (real user data, not sample content)
+/feedback/*
+!/feedback/.gitkeep
