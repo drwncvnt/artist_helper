@@ -20,7 +20,7 @@ const TOOLS = [
   { slug: 'photo', name: 'Photo Editor', desc: 'Glitch & retro photo FX', icon: 'PE', target: process.env.PHOTO_URL },
   { slug: 'promo', name: 'Promo Cards', desc: 'Release promo images', icon: 'PC', target: process.env.PROMO_URL },
   { slug: 'beats', name: 'Beat Share', desc: 'Private audio cloud - share demos by link', icon: 'BS', target: process.env.BEATS_URL },
-  { slug: 'midi', name: 'MIDI Chaos (beta)', desc: 'Algorithmic MIDI', icon: 'MC', target: process.env.MIDI_URL },
+  { slug: 'midi', name: 'MIDI Chaos', desc: 'Generative MIDI sequencer - scales, engines & live preview', icon: 'MC', target: process.env.MIDI_URL },
 ];
 const enabledTools = TOOLS.filter((t) => !!t.target);
 

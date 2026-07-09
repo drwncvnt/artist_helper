@@ -5,30 +5,391 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MIDI Chaos — drwncvnt</title>
   <link rel="stylesheet" href="/shared/xp.css" />
-<script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
+  <script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
   <style>
-    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    .midi-wrap { width: 360px; max-width: 100%; padding: 12px; }
+    body { padding: 16px; }
+    .lab-wrap { width: 720px; max-width: 100%; margin: 0 auto; }
+    .lab-body { padding: 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .groupbox { margin-bottom: 10px; }
+    .groupbox .field { margin-bottom: 8px; }
+    .groupbox .field:last-child { margin-bottom: 0; }
+    .field-label .val { float: right; font-weight: bold; }
+    input[type="range"] { width: 100%; }
+    .switch-row { display: flex; align-items: center; gap: 6px; }
+    .transport { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+    .transport .btn { min-width: 96px; }
+    .seed-line { display: flex; gap: 6px; align-items: center; }
+    .seed-line input { flex: 1; }
+    #roll { width: 100%; height: 180px; display: block; border: 1px inset var(--face);
+            background: #101018; image-rendering: pixelated; }
+    .meta-line { margin-top: 8px; font-size: 11px; min-height: 15px; }
+    .arp-only { display: none; }
+    body.is-arp .arp-only { display: block; }
+    @media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-<div class="midi-wrap">
-  <div class="window">
+<div class="lab-wrap">
+  <div class="window window--full">
     <div class="titlebar">
       <div class="titlebar-icon"></div>
-      <span class="titlebar-text">MIDI Chaos</span>
+      <span class="titlebar-text">MIDI Chaos — generative sequencer</span>
       <div class="titlebar-buttons">
         <a class="status-link" href="/" style="color:#fff; border-color:#6a8ec8;">&#8592; Hub</a>
       </div>
     </div>
-    <div style="padding: 16px; text-align: center;">
-      <p class="hint" style="margin-bottom: 14px;">
-        Generates a 256-note algorithmic IDM sequence (minor scale, octave jumps,
-        micro-timing) and downloads it as a <code>.mid</code> file.
-      </p>
-      <a class="btn primary" href="generate">Generate sequence</a>
+
+    <div class="lab-body">
+      <form id="params" onsubmit="return false;">
+        <div class="grid">
+
+          <!-- Tonality -->
+          <div class="groupbox">
+            <div class="groupbox-title">Tonality</div>
+            <div class="field">
+              <label class="field-label" for="key">Key</label>
+              <select id="key" name="key"></select>
+            </div>
+            <div class="field">
+              <label class="field-label" for="scale">Scale / mode</label>
+              <select id="scale" name="scale"></select>
+            </div>
+            <div class="field">
+              <label class="field-label" for="engine">Engine</label>
+              <select id="engine" name="engine">
+                <option value="random_walk">Random walk</option>
+                <option value="euclidean">Euclidean</option>
+                <option value="arpeggio">Arpeggio</option>
+                <option value="chaos">Chaos (original)</option>
+              </select>
+            </div>
+            <div class="field arp-only">
+              <label class="field-label" for="arp_pattern">Arp pattern</label>
+              <select id="arp_pattern" name="arp_pattern">
+                <option value="up">Up</option>
+                <option value="down">Down</option>
+                <option value="updown" selected>Up-down</option>
+                <option value="random">Random</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Time -->
+          <div class="groupbox">
+            <div class="groupbox-title">Time</div>
+            <div class="field">
+              <label class="field-label" for="bpm">Tempo <span class="val" id="bpm_v">120</span> BPM</label>
+              <input type="range" id="bpm" name="bpm" min="40" max="240" value="120" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="subdivision">Subdivision</label>
+              <select id="subdivision" name="subdivision">
+                <option value="8">1/8</option>
+                <option value="16" selected>1/16</option>
+                <option value="triplet">Triplet</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label" for="bars">Length <span class="val" id="bars_v">8</span> bars</label>
+              <input type="range" id="bars" name="bars" min="1" max="64" value="8" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="swing">Swing <span class="val" id="swing_v">0</span>%</label>
+              <input type="range" id="swing" name="swing" min="0" max="100" value="0" />
+            </div>
+          </div>
+
+          <!-- Pitch -->
+          <div class="groupbox">
+            <div class="groupbox-title">Pitch &amp; density</div>
+            <div class="field">
+              <label class="field-label" for="octave_low">Low octave <span class="val" id="octave_low_v">3</span></label>
+              <input type="range" id="octave_low" name="octave_low" min="0" max="8" value="3" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="octave_high">High octave <span class="val" id="octave_high_v">5</span></label>
+              <input type="range" id="octave_high" name="octave_high" min="0" max="8" value="5" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="density">Density <span class="val" id="density_v">80</span>%</label>
+              <input type="range" id="density" name="density" min="1" max="100" value="80" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="rest_prob">Rests <span class="val" id="rest_prob_v">10</span>%</label>
+              <input type="range" id="rest_prob" name="rest_prob" min="0" max="90" value="10" />
+            </div>
+          </div>
+
+        </div>
+
+        <div class="grid">
+          <!-- Dynamics -->
+          <div class="groupbox">
+            <div class="groupbox-title">Dynamics</div>
+            <div class="field">
+              <label class="field-label" for="velocity_min">Vel. min <span class="val" id="velocity_min_v">70</span></label>
+              <input type="range" id="velocity_min" name="velocity_min" min="1" max="127" value="70" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="velocity_max">Vel. max <span class="val" id="velocity_max_v">120</span></label>
+              <input type="range" id="velocity_max" name="velocity_max" min="1" max="127" value="120" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="humanize">Humanize <span class="val" id="humanize_v">20</span>%</label>
+              <input type="range" id="humanize" name="humanize" min="0" max="100" value="20" />
+            </div>
+          </div>
+
+          <!-- Texture -->
+          <div class="groupbox">
+            <div class="groupbox-title">Texture</div>
+            <div class="field switch-row">
+              <label class="switch"><input type="checkbox" id="chords" name="chords" /><span></span></label>
+              <label for="chords">Stack chords under melody</label>
+            </div>
+            <p class="hint" style="margin-top:8px;">
+              Adds triads beneath each note (ignored by the arpeggiator, which
+              already spells chords).
+            </p>
+          </div>
+
+          <!-- Seed -->
+          <div class="groupbox">
+            <div class="groupbox-title">Seed</div>
+            <div class="field">
+              <label class="field-label" for="seed">Seed (0 = random)</label>
+              <div class="seed-line">
+                <input type="number" id="seed" name="seed" min="0" max="2000000000" value="0" />
+                <button type="button" class="btn small" id="dice" title="Random seed">🎲</button>
+                <button type="button" class="btn small" id="copy" title="Copy seed">Copy</button>
+              </div>
+            </div>
+            <p class="hint" style="margin-top:8px;">
+              Same seed + same settings = same music, every time.
+            </p>
+          </div>
+        </div>
+
+        <div class="transport">
+          <button type="button" class="btn primary" id="play">&#9654; Play</button>
+          <button type="button" class="btn" id="stop" disabled>&#9632; Stop</button>
+          <button type="button" class="btn" id="download">&#11015; Download .mid</button>
+          <button type="button" class="btn" id="reset">Reset</button>
+        </div>
+
+        <canvas id="roll" width="1400" height="360"></canvas>
+        <div class="meta-line hint" id="meta">Press Play to generate and preview.</div>
+      </form>
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SCALES = [
+    "major", "natural_minor", "harmonic_minor", "melodic_minor", "dorian",
+    "phrygian", "lydian", "mixolydian", "locrian", "major_pentatonic",
+    "minor_pentatonic", "blues", "whole_tone", "chromatic"
+  ];
+  var KEYS = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---- populate selects --------------------------------------------------
+  KEYS.forEach(function (k) {
+    var o = document.createElement("option"); o.value = k; o.textContent = k;
+    $("key").appendChild(o);
+  });
+  SCALES.forEach(function (s) {
+    var o = document.createElement("option"); o.value = s;
+    o.textContent = s.replace(/_/g, " ");
+    $("scale").appendChild(o);
+  });
+  $("scale").value = "natural_minor";
+
+  // ---- live value readouts for range inputs ------------------------------
+  var ranges = ["bpm","bars","swing","octave_low","octave_high","density",
+                "rest_prob","velocity_min","velocity_max","humanize"];
+  ranges.forEach(function (id) {
+    var el = $(id), out = $(id + "_v");
+    if (!el || !out) return;
+    var sync = function () { out.textContent = el.value; };
+    el.addEventListener("input", sync); sync();
+  });
+
+  // ---- show/hide arp pattern ---------------------------------------------
+  var engineEl = $("engine");
+  function syncEngine() { document.body.classList.toggle("is-arp", engineEl.value === "arpeggio"); }
+  engineEl.addEventListener("change", syncEngine); syncEngine();
+
+  // ---- seed helpers ------------------------------------------------------
+  $("dice").addEventListener("click", function () {
+    $("seed").value = Math.floor(Math.random() * 2000000000) + 1;
+  });
+  $("copy").addEventListener("click", function () {
+    $("seed").select();
+    try { navigator.clipboard.writeText($("seed").value); } catch (e) {}
+  });
+
+  // ---- build query string from the form ----------------------------------
+  function queryString() {
+    var f = $("params"), parts = [];
+    ["key","scale","engine","arp_pattern","subdivision"].forEach(function (id) {
+      parts.push(id + "=" + encodeURIComponent($(id).value));
+    });
+    ranges.forEach(function (id) { parts.push(id + "=" + $(id).value); });
+    parts.push("seed=" + ($("seed").value || 0));
+    parts.push("chords=" + ($("chords").checked ? 1 : 0));
+    return parts.join("&");
+  }
+
+  // ---- download ----------------------------------------------------------
+  $("download").addEventListener("click", function () {
+    window.location.href = "generate?" + queryString();
+  });
+
+  // ---- reset -------------------------------------------------------------
+  $("reset").addEventListener("click", function () {
+    $("params").reset();
+    setTimeout(function () {
+      ranges.forEach(function (id) { $(id).dispatchEvent(new Event("input")); });
+      syncEngine();
+    }, 0);
+  });
+
+  // ======================================================================
+  //  Web Audio preview: a tiny polyphonic oscillator synth + scheduler
+  // ======================================================================
+  var ctx = null, master = null;
+  var timer = null, voices = [], currentNotes = [];
+
+  function ensureCtx() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.gain.value = 0.25;
+      master.connect(ctx.destination);
+    }
+    if (ctx.state === "suspended") ctx.resume();
+  }
+
+  function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  function scheduleNote(n, startAt) {
+    var osc = ctx.createOscillator();
+    var g = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = midiToFreq(n.p);
+    var peak = Math.max(0.03, (n.vel / 127) * 0.5);
+    var end = startAt + n.dur;
+    g.gain.setValueAtTime(0.0001, startAt);
+    g.gain.linearRampToValueAtTime(peak, startAt + 0.008);        // attack
+    g.gain.exponentialRampToValueAtTime(peak * 0.6, startAt + n.dur * 0.5); // decay
+    g.gain.exponentialRampToValueAtTime(0.0001, end + 0.02);      // release
+    osc.connect(g); g.connect(master);
+    osc.start(startAt);
+    osc.stop(end + 0.05);
+    voices.push(osc);
+    osc.onended = function () {
+      var i = voices.indexOf(osc); if (i >= 0) voices.splice(i, 1);
+    };
+  }
+
+  function stopPlayback() {
+    if (timer) { clearInterval(timer); timer = null; }
+    voices.forEach(function (o) { try { o.stop(); } catch (e) {} });
+    voices = [];
+    $("stop").disabled = true;
+    $("play").disabled = false;
+  }
+  $("stop").addEventListener("click", stopPlayback);
+
+  function playData(data) {
+    ensureCtx();
+    stopPlayback();
+    currentNotes = data.notes;
+    drawRoll(data.notes);
+    $("meta").textContent =
+      "engine: " + data.engine + "  ·  " + data.meta.key + " " +
+      String(data.meta.scale).replace(/_/g, " ") + "  ·  " + data.bpm + " BPM  ·  " +
+      data.notes.length + " notes  ·  seed " + data.seed;
+    $("seed").value = data.seed;   // surface the seed used, for reproducibility
+
+    if (!data.notes.length) { $("play").disabled = false; return; }
+
+    var t0 = ctx.currentTime + 0.1;
+    var total = 0;
+    data.notes.forEach(function (n) { total = Math.max(total, n.start + n.dur); });
+
+    // lookahead scheduler: enqueue notes shortly before they should sound
+    var scheduled = 0;
+    var LOOKAHEAD = 0.2;
+    $("play").disabled = true;
+    $("stop").disabled = false;
+    timer = setInterval(function () {
+      var horizon = ctx.currentTime - t0 + LOOKAHEAD;
+      while (scheduled < data.notes.length && data.notes[scheduled].start <= horizon) {
+        scheduleNote(data.notes[scheduled], t0 + data.notes[scheduled].start);
+        scheduled++;
+      }
+      if (ctx.currentTime - t0 > total + 0.3) { stopPlayback(); }
+    }, 25);
+  }
+
+  $("play").addEventListener("click", function () {
+    ensureCtx();
+    $("play").disabled = true;
+    $("meta").textContent = "generating…";
+    fetch("preview?" + queryString())
+      .then(function (r) { return r.json(); })
+      .then(playData)
+      .catch(function (e) {
+        $("meta").textContent = "preview failed: " + e;
+        $("play").disabled = false;
+      });
+  });
+
+  // ---- piano-roll canvas -------------------------------------------------
+  function drawRoll(notes) {
+    var c = $("roll"), g = c.getContext("2d");
+    var W = c.width, H = c.height;
+    g.fillStyle = "#101018"; g.fillRect(0, 0, W, H);
+    if (!notes.length) return;
+
+    var minP = 127, maxP = 0, dur = 0;
+    notes.forEach(function (n) {
+      if (n.p < minP) minP = n.p;
+      if (n.p > maxP) maxP = n.p;
+      dur = Math.max(dur, n.start + n.dur);
+    });
+    var pad = 2;
+    var range = Math.max(1, maxP - minP);
+    var rowH = (H - pad * 2) / (range + 1);
+    var scaleX = (W - pad * 2) / Math.max(0.001, dur);
+
+    // faint horizontal guide lines per octave
+    g.strokeStyle = "rgba(255,255,255,0.06)";
+    for (var p = minP; p <= maxP; p++) {
+      if (p % 12 === 0) {
+        var yy = pad + (maxP - p) * rowH;
+        g.beginPath(); g.moveTo(0, yy); g.lineTo(W, yy); g.stroke();
+      }
+    }
+
+    notes.forEach(function (n) {
+      var x = pad + n.start * scaleX;
+      var y = pad + (maxP - n.p) * rowH;
+      var w = Math.max(2, n.dur * scaleX - 1);
+      var hue = 190 + (n.p - minP) / (range + 1) * 120;
+      var light = 40 + (n.vel / 127) * 35;
+      g.fillStyle = "hsl(" + hue + ",70%," + light + "%)";
+      g.fillRect(x, y, w, Math.max(2, rowH - 1));
+    });
+  }
+})();
+</script>
 </body>
 </html>

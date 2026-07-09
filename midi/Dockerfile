@@ -3,7 +3,7 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py index.html ./
+COPY app.py generator.py index.html ./
 
 EXPOSE 11000
 # Behind the gateway; not exposed publicly.

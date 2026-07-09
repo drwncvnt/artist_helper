@@ -5,6 +5,10 @@
 node_modules/
 npm-debug.log*
 
+# Python
+__pycache__/
+*.pyc
+
 # OS / editor cruft
 .DS_Store
 *.log

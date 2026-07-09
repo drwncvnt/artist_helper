@@ -9,7 +9,7 @@ The platform bundles four tools that used to be separate apps:
 | **Photo Editor** | Real-time glitch / retro / VHS / datamosh photo & video FX (WebGL2) | Static + WebGL |
 | **Promo Cards** | Generate 1080×1920 release promo cards from a cover | Flask + Pillow |
 | **Beat Share** | Private audio cloud - keep demos/beats private or public, share any track by link (no account needed to listen) | FastAPI + React |
-| **MIDI Chaos** | Generate algorithmic IDM MIDI sequences | Flask + mido |
+| **MIDI Chaos** | Generative MIDI sequencer - pick key/scale, engine (random-walk, euclidean, arpeggio, chaos), density, swing & seed; preview in-browser, download `.mid` | Flask + mido |
 
 
 
@@ -90,7 +90,7 @@ shared/     shared design system (xp.css) used by the hub and every tool
 photo/      Photo Editor  (static WebGL app)
 promo/      Promo Cards   (Flask)
 beats/      Beat Share    (FastAPI backend + React frontend, one container)
-midi/       MIDI Chaos    (Flask)
+midi/       MIDI Chaos    (Flask; app.py + generator.py music core)
 docker-compose.yml
 ```
 
