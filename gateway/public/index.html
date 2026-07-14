@@ -6,6 +6,7 @@
 <title>Artist Helper</title>
 <link rel="stylesheet" href="/shared/xp.css" />
 <script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
+<script src="/shared/platform-ui.js" defer></script>
 </head>
 <body>
 <div class="window window--full">
@@ -20,7 +21,8 @@
   </div>
 
   <div class="menubar">
-    <span>File</span><span>View</span><span id="helpMenuItem" role="button" tabindex="0">Help</span>
+    <span role="button" tabindex="0" data-platform-help>Help</span>
+    <span role="button" tabindex="0" data-platform-aboba>aboba</span>
     <div class="auth-status" id="authStatus"></div>
   </div>
 
@@ -37,39 +39,6 @@
     <a class="status-link" href="https://github.com/drwncvnt/artist_helper" target="_blank" rel="noopener">
       open source - github.com/drwncvnt/artist_helper
     </a>
-  </div>
-</div>
-
-<div class="dialog-overlay hidden" id="feedbackDialog">
-  <div class="dialog window">
-    <div class="titlebar">
-      <div class="titlebar-icon"></div>
-      <span class="titlebar-text">Feedback &amp; bug reports</span>
-      <div class="titlebar-buttons">
-        <button class="win-btn win-btn-close" id="feedbackCloseBtn" tabindex="-1">X</button>
-      </div>
-    </div>
-    <div class="dialog-body">
-      <form id="feedbackForm">
-        <p class="dialog-error" id="feedbackError"></p>
-        <div class="field">
-          <label class="field-label" for="feedbackType">Type</label>
-          <select id="feedbackType">
-            <option value="feedback">General feedback</option>
-            <option value="bug">Bug report</option>
-          </select>
-        </div>
-        <div class="field">
-          <label class="field-label" for="feedbackMessage">Message</label>
-          <textarea id="feedbackMessage" rows="6" maxlength="5000"
-            placeholder="What's on your mind? For bugs, include what you did and what went wrong." required></textarea>
-        </div>
-        <div class="dialog-actions">
-          <button type="button" class="btn" id="feedbackCancelBtn">Cancel</button>
-          <button type="submit" class="btn primary" id="feedbackSubmitBtn">Send</button>
-        </div>
-      </form>
-    </div>
   </div>
 </div>
 
@@ -129,61 +98,6 @@
     renderTiles(reg.tools);
   }).catch(() => {
     statusText.textContent = 'Failed to load. Refresh to retry.';
-  });
-
-  // ---- Help > Feedback / bug report dialog ----
-  const helpMenuItem = document.getElementById('helpMenuItem');
-  const feedbackDialog = document.getElementById('feedbackDialog');
-  const feedbackForm = document.getElementById('feedbackForm');
-  const feedbackError = document.getElementById('feedbackError');
-  const feedbackMessage = document.getElementById('feedbackMessage');
-  const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
-
-  function openFeedback() {
-    feedbackError.textContent = '';
-    feedbackForm.reset();
-    feedbackDialog.classList.remove('hidden');
-    feedbackMessage.focus();
-  }
-  function closeFeedback() {
-    feedbackDialog.classList.add('hidden');
-  }
-
-  helpMenuItem.addEventListener('click', openFeedback);
-  helpMenuItem.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFeedback(); }
-  });
-  document.getElementById('feedbackCloseBtn').addEventListener('click', closeFeedback);
-  document.getElementById('feedbackCancelBtn').addEventListener('click', closeFeedback);
-  feedbackDialog.addEventListener('click', (e) => {
-    if (e.target === feedbackDialog) closeFeedback();
-  });
-
-  feedbackForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    feedbackError.textContent = '';
-    feedbackSubmitBtn.disabled = true;
-    try {
-      const res = await fetch('/api/feedback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: document.getElementById('feedbackType').value,
-          message: feedbackMessage.value,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        feedbackError.textContent = data.error || 'Could not send. Please try again.';
-        return;
-      }
-      statusText.textContent = 'Thanks - your message was sent.';
-      closeFeedback();
-    } catch {
-      feedbackError.textContent = 'Network error. Please try again.';
-    } finally {
-      feedbackSubmitBtn.disabled = false;
-    }
   });
 })();
 </script>

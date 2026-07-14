@@ -9,6 +9,7 @@ const { verify, COOKIE_NAME } = require('./jwt');
 const PORT = process.env.PORT || 4000;
 const ACCOUNTS_URL = process.env.ACCOUNTS_URL || 'http://accounts:4100';
 const SHARED_DIR = process.env.SHARED_DIR || path.join(__dirname, 'shared');
+const PUBASSETS_DIR = process.env.PUBASSETS_DIR || path.join(__dirname, 'pubassets');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const FEEDBACK_DIR = process.env.FEEDBACK_DIR || path.join(__dirname, 'feedback');
 fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
@@ -41,9 +42,13 @@ function readSession(req) {
 
 // ---- Public routes -------------------------------------------------------
 
-// Shared design system (CSS, and any shared assets). No secrets here, and the
-// login page needs it, so it stays public.
+// Shared design system (CSS, JS, and any shared assets). No secrets here, and
+// the login page needs it, so it stays public.
 app.use('/shared', express.static(SHARED_DIR, { maxAge: '1h' }));
+
+// Public static assets (e.g. the aboba gif) served to every tool. Public so the
+// login page and all tools can reference them without a session.
+app.use('/public', express.static(PUBASSETS_DIR, { maxAge: '1h' }));
 
 // Auth API is proxied to the accounts service. pathFilter keeps the original
 // path (/api/auth/login etc.) intact when forwarding.

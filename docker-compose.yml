@@ -78,6 +78,7 @@ services:
       BEATS_URL: http://beats:8000
     volumes:
       - ./shared:/app/shared:ro
+      - ./public:/app/pubassets:ro
       - ./feedback:/app/feedback
     depends_on:
       - accounts

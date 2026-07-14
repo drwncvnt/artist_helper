@@ -31,6 +31,7 @@ HTML_TEMPLATE = """
   <title>Promo Cards - drwncvnt</title>
   <link rel="stylesheet" href="/shared/xp.css" />
   <script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
+  <script src="/shared/platform-ui.js" defer></script>
   <style>
     body { padding: 0; }
     .promo-wrap { max-width: 460px; margin: 24px auto; padding: 0 12px; }
@@ -46,6 +47,10 @@ HTML_TEMPLATE = """
       <div class="titlebar-buttons">
         <a class="status-link" href="/" style="color:#fff; border-color:#6a8ec8;">&#8592; Hub</a>
       </div>
+    </div>
+    <div class="menubar">
+      <span role="button" tabindex="0" data-platform-help>Help</span>
+      <span role="button" tabindex="0" data-platform-aboba>aboba</span>
     </div>
     <div style="padding: 12px;">
       <p class="hint" style="margin-bottom: 12px;">

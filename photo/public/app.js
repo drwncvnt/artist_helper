@@ -162,7 +162,6 @@
     duotoneOn: false, duotoneShadow: '#1a0b2e', duotoneHighlight: '#ff7ac6', duotoneMix: 1.0,
     grainOn: false, grainAmount: 0.25,
     vignetteOn: false, vignetteAmount: 0.4,
-    audioReactOn: false, audioSensitivity: 0.6,
   };
 
   function hexToRgb(hex) {
@@ -193,22 +192,6 @@
     sortCanvas.height = imgHeight;
 
     recreateDatamoshBuffers(imgWidth, imgHeight);
-  }
-
-  function getAudioBands() {
-    if (!state.audioReactOn || !analyser) return { bass: 0, mid: 0, treble: 0 };
-    analyser.getByteFrequencyData(audioData);
-    const n = audioData.length;
-    const avg = (from, to) => {
-      let s = 0;
-      for (let i = from; i < to; i++) s += audioData[i];
-      return s / (to - from) / 255;
-    };
-    return {
-      bass: avg(0, Math.floor(n * 0.08)),
-      mid: avg(Math.floor(n * 0.08), Math.floor(n * 0.35)),
-      treble: avg(Math.floor(n * 0.35), Math.floor(n * 0.9)),
-    };
   }
 
   function render() {
@@ -246,9 +229,6 @@
         datamoshSeeded = false;
       }
 
-      const audio = getAudioBands();
-      const sens = state.audioSensitivity;
-
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, mainImageTexture);
       gl.uniform1i(u('u_image'), 0);
@@ -284,7 +264,7 @@
       gl.uniform1f(u('u_vhsSaturation'), state.vhsSaturation);
 
       gl.uniform1f(u('u_glitchOn'), state.glitchOn ? 1 : 0);
-      gl.uniform1f(u('u_glitchAmount'), Math.min(1, state.glitchAmount + audio.bass * sens));
+      gl.uniform1f(u('u_glitchAmount'), state.glitchAmount);
       gl.uniform1f(u('u_glitchBlock'), state.glitchBlock);
 
       gl.uniform1f(u('u_blockOn'), state.blockOn ? 1 : 0);
@@ -292,7 +272,7 @@
       gl.uniform1f(u('u_blockSize'), state.blockSize);
 
       gl.uniform1f(u('u_rgbSplitOn'), state.rgbSplitOn ? 1 : 0);
-      gl.uniform1f(u('u_rgbSplitAmount'), Math.min(1, state.rgbSplitAmount + audio.treble * sens));
+      gl.uniform1f(u('u_rgbSplitAmount'), state.rgbSplitAmount);
 
       gl.uniform1f(u('u_halftoneOn'), state.halftoneOn ? 1 : 0);
       gl.uniform1f(u('u_halftoneSize'), state.halftoneSize);
@@ -304,7 +284,7 @@
 
       gl.uniform1f(u('u_bloomOn'), state.bloomOn ? 1 : 0);
       gl.uniform1f(u('u_bloomThreshold'), state.bloomThreshold);
-      gl.uniform1f(u('u_bloomAmount'), Math.min(1, state.bloomAmount + audio.mid * sens));
+      gl.uniform1f(u('u_bloomAmount'), state.bloomAmount);
 
       gl.uniform1f(u('u_lightLeakOn'), state.lightLeakOn ? 1 : 0);
       gl.uniform1f(u('u_lightLeakAmount'), state.lightLeakAmount);
@@ -403,8 +383,6 @@
     ['datamoshAmount', 'datamoshAmount', 'value:number'],
     ['datamoshDrift', 'datamoshDrift', 'value:number'],
     ['datamoshKeyframe', 'datamoshKeyframe', 'value:number'],
-    ['audioReactOn', 'audioReactOn', 'checked'],
-    ['audioSensitivity', 'audioSensitivity', 'value:number'],
     ['duotoneOn', 'duotoneOn', 'checked'],
     ['duotoneShadow', 'duotoneShadow', 'value:string'],
     ['duotoneHighlight', 'duotoneHighlight', 'value:string'],
@@ -644,54 +622,6 @@
   document.getElementById('sortApplyBtn').addEventListener('click', applyPixelSort);
   document.getElementById('sortClearBtn').addEventListener('click', () => {
     sortCanvas.classList.add('hidden');
-  });
-
-  // ---- Audio-Reactive ----
-  let audioCtx = null, analyser = null, audioData = null, audioEl = null, mediaSource = null;
-
-  const audioInput = document.getElementById('audioInput');
-  const audioPlayBtn = document.getElementById('audioPlayBtn');
-  const audioStopBtn = document.getElementById('audioStopBtn');
-
-  audioInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      audioData = new Uint8Array(analyser.frequencyBinCount);
-    }
-    if (audioEl) { audioEl.pause(); audioEl.src = ''; }
-    audioEl = new Audio();
-    audioEl.src = URL.createObjectURL(file);
-    audioEl.loop = true;
-    if (mediaSource) mediaSource.disconnect();
-    mediaSource = audioCtx.createMediaElementSource(audioEl);
-    mediaSource.connect(analyser);
-    analyser.connect(audioCtx.destination);
-    audioPlayBtn.disabled = false;
-    audioStopBtn.disabled = false;
-    audioPlayBtn.textContent = 'Play';
-  });
-
-  audioPlayBtn.addEventListener('click', () => {
-    if (!audioEl) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    if (audioEl.paused) {
-      audioEl.play();
-      audioPlayBtn.textContent = 'Pause';
-    } else {
-      audioEl.pause();
-      audioPlayBtn.textContent = 'Play';
-    }
-  });
-
-  audioStopBtn.addEventListener('click', () => {
-    if (!audioEl) return;
-    audioEl.pause();
-    audioEl.currentTime = 0;
-    audioPlayBtn.textContent = 'Play';
   });
 
   window.addEventListener('resize', () => { if (hasImage) resizeCanvasToImage(); });

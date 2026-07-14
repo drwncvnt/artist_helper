@@ -329,7 +329,6 @@
     duotoneOn: false, duotoneShadow: '#1a0b2e', duotoneHighlight: '#ff7ac6', duotoneMix: 1.0,
     grainOn: false, grainAmount: 0.25,
     vignetteOn: false, vignetteAmount: 0.4,
-    audioReactOn: false, audioSensitivity: 0.6,
   };
 
   for (const group of EFFECT_GROUPS) {
@@ -353,11 +352,6 @@
   document.getElementById('vfxDatamoshResetBtn').addEventListener('click', () => {
     datamoshSeeded = false;
   });
-
-  const audioReactCheckbox = document.getElementById('vfxAudioReactOn');
-  const audioSensitivityInput = document.getElementById('vfxAudioSensitivity');
-  audioReactCheckbox.addEventListener('input', () => { state.audioReactOn = audioReactCheckbox.checked; });
-  audioSensitivityInput.addEventListener('input', () => { state.audioSensitivity = parseFloat(audioSensitivityInput.value); });
 
   function applyAspect() {
     const [w, h] = ASPECTS[state.aspect];
@@ -383,7 +377,7 @@
   document.querySelector('.vfx-aspect-btn[data-aspect="16:9"]').classList.add('active');
   applyAspect();
 
-  function drawEffects(sourceTex, time, bass, mid, treble) {
+  function drawEffects(sourceTex, time) {
     let mainTex = sourceTex;
 
     if (state.datamoshOn) {
@@ -412,8 +406,6 @@
     } else {
       datamoshSeeded = false;
     }
-
-    const sens = state.audioReactOn ? state.audioSensitivity : 0;
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, mainTex);
@@ -450,7 +442,7 @@
     gl.uniform1f(u('u_vhsSaturation'), state.vhsSaturation);
 
     gl.uniform1f(u('u_glitchOn'), state.glitchOn ? 1 : 0);
-    gl.uniform1f(u('u_glitchAmount'), Math.min(1, state.glitchAmount + bass * sens));
+    gl.uniform1f(u('u_glitchAmount'), state.glitchAmount);
     gl.uniform1f(u('u_glitchBlock'), state.glitchBlock);
 
     gl.uniform1f(u('u_blockOn'), state.blockOn ? 1 : 0);
@@ -458,7 +450,7 @@
     gl.uniform1f(u('u_blockSize'), state.blockSize);
 
     gl.uniform1f(u('u_rgbSplitOn'), state.rgbSplitOn ? 1 : 0);
-    gl.uniform1f(u('u_rgbSplitAmount'), Math.min(1, state.rgbSplitAmount + treble * sens));
+    gl.uniform1f(u('u_rgbSplitAmount'), state.rgbSplitAmount);
 
     gl.uniform1f(u('u_halftoneOn'), state.halftoneOn ? 1 : 0);
     gl.uniform1f(u('u_halftoneSize'), state.halftoneSize);
@@ -470,7 +462,7 @@
 
     gl.uniform1f(u('u_bloomOn'), state.bloomOn ? 1 : 0);
     gl.uniform1f(u('u_bloomThreshold'), state.bloomThreshold);
-    gl.uniform1f(u('u_bloomAmount'), Math.min(1, state.bloomAmount + mid * sens));
+    gl.uniform1f(u('u_bloomAmount'), state.bloomAmount);
 
     gl.uniform1f(u('u_lightLeakOn'), state.lightLeakOn ? 1 : 0);
     gl.uniform1f(u('u_lightLeakAmount'), state.lightLeakAmount);
@@ -515,26 +507,33 @@
   const removeCustomAudioBtn = document.getElementById('vfxRemoveCustomAudioBtn');
   const customAudioNote = document.getElementById('vfxCustomAudioNote');
 
+  const muteOriginalCheckbox = document.getElementById('vfxMuteOriginal');
+
   let hasVideo = false;
   let videoAudioBuffer = null;
   let customAudioBuffer = null;
+  let muteOriginal = false;
   let audioCtx = null;
   let mediaSource = null;
-  let liveAnalyser = null;
-  let liveData = null;
   let videoGain = null;
   let customGain = null;
   let customSourceNode = null;
   let startTime = performance.now();
 
-  function updateAudioReactAvailability() {
-    const available = !!(videoAudioBuffer || customAudioBuffer);
-    audioReactCheckbox.disabled = !available;
-    if (!available) {
-      audioReactCheckbox.checked = false;
-      state.audioReactOn = false;
-    }
+  // The video's own audio is silenced during preview whenever custom audio has
+  // been loaded (it replaces the original) or "Mute original audio" is ticked.
+  function originalSilenced() {
+    return !!customAudioBuffer || muteOriginal;
   }
+  function applyPlaybackMute() {
+    videoEl.muted = originalSilenced();
+    if (audioCtx && videoGain) videoGain.gain.value = originalSilenced() ? 0 : 1;
+  }
+
+  muteOriginalCheckbox.addEventListener('input', () => {
+    muteOriginal = muteOriginalCheckbox.checked;
+    applyPlaybackMute();
+  });
 
   async function loadVideoFile(file) {
     statusEl.textContent = 'Loading video...';
@@ -555,7 +554,6 @@
       videoAudioBuffer = null;
       audioNote.textContent = 'No audio track detected in this video.';
     }
-    updateAudioReactAvailability();
   }
 
   videoInput.addEventListener('change', (e) => {
@@ -571,13 +569,11 @@
       customAudioBuffer = await decodeAudioFile(file);
       removeCustomAudioBtn.disabled = false;
       customAudioNote.textContent = 'Custom audio loaded: ' + file.name + ' (' + customAudioBuffer.duration.toFixed(1) + 's) - replaces original audio in the export.';
-      if (audioCtx) { videoGain.gain.value = 0; }
-      videoEl.muted = true;
+      applyPlaybackMute();
     } catch (err) {
       customAudioBuffer = null;
       customAudioNote.textContent = 'Could not decode that audio file.';
     }
-    updateAudioReactAvailability();
   });
 
   removeCustomAudioBtn.addEventListener('click', () => {
@@ -585,9 +581,7 @@
     stopCustomAudioPlayback();
     removeCustomAudioBtn.disabled = true;
     customAudioNote.textContent = 'None loaded - export keeps the video\'s own audio.';
-    if (audioCtx) { videoGain.gain.value = 1; }
-    videoEl.muted = false;
-    updateAudioReactAvailability();
+    applyPlaybackMute();
   });
 
   const wrap = document.getElementById('vfxCanvasWrap');
@@ -602,19 +596,14 @@
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       mediaSource = audioCtx.createMediaElementSource(videoEl);
-      liveAnalyser = audioCtx.createAnalyser();
-      liveAnalyser.fftSize = 512;
-      liveData = new Uint8Array(liveAnalyser.frequencyBinCount);
       videoGain = audioCtx.createGain();
       customGain = audioCtx.createGain();
       mediaSource.connect(videoGain);
-      videoGain.connect(liveAnalyser);
       videoGain.connect(audioCtx.destination);
-      customGain.connect(liveAnalyser);
       customGain.connect(audioCtx.destination);
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    videoGain.gain.value = customAudioBuffer ? 0 : 1;
+    videoGain.gain.value = originalSilenced() ? 0 : 1;
   }
 
   function startCustomAudioPlayback() {
@@ -638,7 +627,7 @@
     if (!hasVideo) return;
     ensureAudioGraph();
     if (customAudioBuffer) startCustomAudioPlayback();
-    videoEl.muted = !!customAudioBuffer;
+    applyPlaybackMute();
     videoEl.play();
   });
   pauseBtn.addEventListener('click', () => {
@@ -654,14 +643,7 @@
     if (hasVideo && videoEl.readyState >= 2) {
       gl.bindTexture(gl.TEXTURE_2D, videoTexture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, videoEl);
-
-      let bass = 0, mid = 0, treble = 0;
-      if (state.audioReactOn && liveAnalyser && !videoEl.paused) {
-        liveAnalyser.getByteFrequencyData(liveData);
-        const b = bandsFromFreqData(liveData);
-        bass = b.bass; mid = b.mid; treble = b.treble;
-      }
-      drawEffects(videoTexture, time, bass, mid, treble);
+      drawEffects(videoTexture, time);
     }
     requestAnimationFrame(previewLoop);
   }
@@ -704,13 +686,8 @@
 
     const duration = videoEl.duration;
     const frameCount = Math.ceil(duration * FPS);
-    const exportAudioBuffer = customAudioBuffer || videoAudioBuffer;
-
-    let bands = null;
-    if (state.audioReactOn && exportAudioBuffer) {
-      statusEl.textContent = 'Analyzing audio...';
-      bands = await analyzeAudioOffline(exportAudioBuffer, FPS);
-    }
+    // Custom audio replaces the original; "Mute original" drops it entirely.
+    const exportAudioBuffer = customAudioBuffer || (muteOriginal ? null : videoAudioBuffer);
 
     const videoCodec = await pickVideoCodec(width, height, FPS);
     const audioCodec = exportAudioBuffer
@@ -764,8 +741,7 @@
       gl.bindTexture(gl.TEXTURE_2D, videoTexture);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, videoEl);
 
-      const b = bands ? bands[i] : { bass: 0, mid: 0, treble: 0 };
-      drawEffects(videoTexture, t, b.bass, b.mid, b.treble);
+      drawEffects(videoTexture, t);
 
       const frame = new VideoFrame(canvas, { timestamp: Math.round(t * 1e6) });
       await encodeQueueWait(videoEncoder);

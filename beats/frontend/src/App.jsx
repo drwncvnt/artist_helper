@@ -168,7 +168,8 @@ function App() {
       </div>
 
       <div className="menubar">
-        <span>File</span><span>View</span><span>Help</span>
+        <span role="button" tabIndex={0} data-platform-help>Help</span>
+        <span role="button" tabIndex={0} data-platform-aboba>aboba</span>
         <div className="menubar-right">signed in as <b>{user.username}</b></div>
       </div>
 
