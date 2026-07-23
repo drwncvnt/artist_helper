@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Audio Analyzer - drwncvnt</title>
+<link rel="stylesheet" href="/shared/xp.css" />
+<script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
+<script src="/shared/platform-ui.js" defer></script>
+<style>
+  body { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; }
+  .aa { width: 440px; max-width: 100%; margin: 24px 12px; }
+  .aa .body { padding: 12px; }
+  .status {
+    border: 1px inset var(--face); background: var(--field-bg);
+    padding: 8px; margin-top: 10px; font-size: 11px; min-height: 34px;
+  }
+  .status.err { color: var(--danger); }
+  .results { margin-top: 10px; }
+  .results table { width: 100%; border-collapse: collapse; }
+  .results td { padding: 3px 6px; font-size: 11px; border-bottom: 1px solid var(--face-dark); }
+  .results td:first-child { color: #303030; width: 55%; }
+  .results td:last-child { font-weight: bold; text-align: right; }
+</style>
+</head>
+<body>
+<div class="aa">
+  <div class="window">
+    <div class="titlebar">
+      <div class="titlebar-icon"></div>
+      <span class="titlebar-text">Audio Analyzer</span>
+      <div class="titlebar-buttons">
+        <a class="status-link" href="/" style="color:#fff; border-color:#6a8ec8;">&#8592; Hub</a>
+      </div>
+    </div>
+
+    <div class="menubar">
+      <span role="button" tabindex="0" data-platform-help>Help</span>
+      <span role="button" tabindex="0" data-platform-aboba>aboba</span>
+    </div>
+
+    <div class="body">
+      <p class="hint" style="margin-bottom: 12px;">
+        Get BPM and key, plus loudness and level metrics, for a single audio clip.
+        No reference track needed - just upload and analyze.
+      </p>
+
+      <form id="form" class="groupbox">
+        <div class="field">
+          <label class="field-label" for="file">Audio clip</label>
+          <input type="file" id="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aac" required />
+        </div>
+        <div class="dialog-actions" style="margin-top: 10px;">
+          <button type="submit" class="btn primary" id="submitBtn">Analyze</button>
+        </div>
+      </form>
+
+      <div class="status hint" id="status">Ready.</div>
+
+      <div class="results groupbox hidden" id="results">
+        <table>
+          <tr><td>Tempo</td><td id="rBpm"></td></tr>
+          <tr><td>Key</td><td id="rKey"></td></tr>
+          <tr><td>Integrated loudness</td><td id="rLufs"></td></tr>
+          <tr><td>Peak level</td><td id="rPeak"></td></tr>
+          <tr><td>RMS level</td><td id="rRms"></td></tr>
+          <tr><td>Crest factor</td><td id="rCrest"></td></tr>
+          <tr><td>Spectral centroid</td><td id="rCentroid"></td></tr>
+          <tr><td>Duration</td><td id="rDuration"></td></tr>
+          <tr><td>Sample rate</td><td id="rSampleRate"></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const form = document.getElementById('form');
+  const fileEl = document.getElementById('file');
+  const submitBtn = document.getElementById('submitBtn');
+  const statusEl = document.getElementById('status');
+  const resultsEl = document.getElementById('results');
+
+  function setStatus(text, isError) {
+    statusEl.textContent = text;
+    statusEl.classList.toggle('err', !!isError);
+  }
+
+  function fill(id, value) {
+    document.getElementById(id).textContent = value;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!fileEl.files[0]) return;
+    resultsEl.classList.add('hidden');
+    submitBtn.disabled = true;
+    setStatus('Analyzing... this can take a few seconds.');
+
+    const fd = new FormData();
+    fd.append('file', fileEl.files[0]);
+
+    try {
+      const res = await fetch('api/analyze', { method: 'POST', body: fd, credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStatus(data.detail || 'Analysis failed.', true);
+        return;
+      }
+
+      fill('rBpm', data.bpm + ' BPM');
+      fill('rKey', data.key + ' (confidence ' + Math.round(data.key_confidence * 100) + '%)');
+      fill('rLufs', data.integrated_lufs != null ? data.integrated_lufs + ' LUFS' : 'n/a');
+      fill('rPeak', data.peak_db != null ? data.peak_db + ' dBFS' : 'n/a');
+      fill('rRms', data.rms_db != null ? data.rms_db + ' dBFS' : 'n/a');
+      fill('rCrest', data.crest_factor_db != null ? data.crest_factor_db + ' dB' : 'n/a');
+      fill('rCentroid', data.spectral_centroid_hz + ' Hz');
+      fill('rDuration', data.duration_seconds + 's');
+      fill('rSampleRate', data.sample_rate + ' Hz');
+
+      resultsEl.classList.remove('hidden');
+      setStatus('Done.');
+    } catch {
+      setStatus('Network error. Please try again.', true);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>

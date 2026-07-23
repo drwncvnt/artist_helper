@@ -76,6 +76,19 @@ services:
       - transcribe-work:/data/work
     restart: unless-stopped
 
+  # Single-clip audio analysis: BPM, key, loudness/level metrics. No reference
+  # track, no queue - analysis is cheap enough to run inline in a small pool.
+  analyzer:
+    build: ./analyzer
+    container_name: dp_analyzer
+    environment:
+      UPLOAD_DIR: /data/uploads
+      MAX_UPLOAD_MB: ${ANALYZER_MAX_UPLOAD_MB:-40}
+      MAX_DURATION_SECONDS: ${ANALYZER_MAX_DURATION_SECONDS:-300}
+    volumes:
+      - analyzer-uploads:/data/uploads
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     container_name: dp_gateway
@@ -90,6 +103,7 @@ services:
       MIDI_URL: http://midi:11000
       BEATS_URL: http://beats:8000
       TRANSCRIBE_URL: http://transcribe:8000
+      ANALYZER_URL: http://analyzer:8000
     volumes:
       - ./shared:/app/shared:ro
       - ./public:/app/pubassets:ro
@@ -101,6 +115,7 @@ services:
       - midi
       - beats
       - transcribe
+      - analyzer
     ports:
       - "${GATEWAY_PORT:-4000}:4000"
     restart: unless-stopped
@@ -110,3 +125,4 @@ volumes:
   beats-storage:
   beats-db:
   transcribe-work:
+  analyzer-uploads:
