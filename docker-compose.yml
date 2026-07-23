@@ -63,6 +63,19 @@ services:
       - beats-db:/data/db
     restart: unless-stopped
 
+  # Audio -> MIDI transcription. Caps concurrent analyses at 2 (in-process queue),
+  # so this runs as a single web process; extra requests wait in line.
+  transcribe:
+    build: ./transcribe
+    container_name: dp_transcribe
+    environment:
+      WORK_DIR: /data/work
+      MAX_UPLOAD_MB: ${TRANSCRIBE_MAX_UPLOAD_MB:-25}
+      MAX_DURATION_SECONDS: ${TRANSCRIBE_MAX_DURATION_SECONDS:-60}
+    volumes:
+      - transcribe-work:/data/work
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     container_name: dp_gateway
@@ -76,6 +89,7 @@ services:
       PROMO_URL: http://promo:5002
       MIDI_URL: http://midi:11000
       BEATS_URL: http://beats:8000
+      TRANSCRIBE_URL: http://transcribe:8000
     volumes:
       - ./shared:/app/shared:ro
       - ./public:/app/pubassets:ro
@@ -86,6 +100,7 @@ services:
       - promo
       - midi
       - beats
+      - transcribe
     ports:
       - "${GATEWAY_PORT:-4000}:4000"
     restart: unless-stopped
@@ -94,3 +109,4 @@ volumes:
   db-data:
   beats-storage:
   beats-db:
+  transcribe-work:

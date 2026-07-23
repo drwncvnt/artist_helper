@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Audio to MIDI - drwncvnt</title>
+<link rel="stylesheet" href="/shared/xp.css" />
+<script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
+<script src="/shared/platform-ui.js" defer></script>
+<style>
+  body { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; }
+  .a2m { width: 440px; max-width: 100%; margin: 24px 12px; }
+  .a2m .body { padding: 12px; }
+  .a2m .field { margin-bottom: 10px; }
+  .a2m .row { display: flex; gap: 10px; }
+  .a2m .row .field { flex: 1; }
+  .status {
+    border: 1px inset var(--face); background: var(--field-bg);
+    padding: 8px; margin-top: 10px; font-size: 11px; min-height: 34px;
+  }
+  .status.err { color: var(--danger); }
+  .spin { display: inline-block; }
+</style>
+</head>
+<body>
+<div class="a2m">
+  <div class="window">
+    <div class="titlebar">
+      <div class="titlebar-icon"></div>
+      <span class="titlebar-text">Audio to MIDI</span>
+      <div class="titlebar-buttons">
+        <a class="status-link" href="/" style="color:#fff; border-color:#6a8ec8;">&#8592; Hub</a>
+      </div>
+    </div>
+
+    <div class="menubar">
+      <span role="button" tabindex="0" data-platform-help>Help</span>
+      <span role="button" tabindex="0" data-platform-aboba>aboba</span>
+    </div>
+
+    <div class="body">
+      <p class="hint" style="margin-bottom: 12px;">
+        Drop in an audio clip and a tempo; get back a MIDI transcription. Keep clips
+        short (under 60s) and monophonic-ish for the cleanest results.
+      </p>
+
+      <form id="form" class="groupbox">
+        <div class="field">
+          <label class="field-label" for="file">Audio clip</label>
+          <input type="file" id="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aac" required />
+        </div>
+        <div class="row">
+          <div class="field">
+            <label class="field-label" for="tempo">Tempo (BPM)</label>
+            <input type="number" id="tempo" value="120" min="20" max="300" step="1" required />
+          </div>
+        </div>
+        <label class="checkline">
+          <span class="switch"><input type="checkbox" id="quantize" /><span></span></span>
+          <span>Quantize notes to the tempo grid (1/16)</span>
+        </label>
+        <div class="dialog-actions" style="margin-top: 12px;">
+          <button type="submit" class="btn primary" id="submitBtn">Transcribe</button>
+        </div>
+      </form>
+
+      <div class="status hint" id="status">Ready.</div>
+
+      <div id="result" class="hidden" style="margin-top: 10px;">
+        <a class="btn primary block" id="downloadBtn" href="#">Download .mid</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const form = document.getElementById('form');
+  const fileEl = document.getElementById('file');
+  const tempoEl = document.getElementById('tempo');
+  const quantizeEl = document.getElementById('quantize');
+  const submitBtn = document.getElementById('submitBtn');
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('result');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  let polling = null;
+
+  function setStatus(text, isError) {
+    statusEl.textContent = text;
+    statusEl.classList.toggle('err', !!isError);
+  }
+
+  function reset(enable) {
+    submitBtn.disabled = !enable;
+    if (polling) { clearInterval(polling); polling = null; }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!fileEl.files[0]) return;
+    resultEl.classList.add('hidden');
+    reset(false);
+    setStatus('Uploading...');
+
+    const fd = new FormData();
+    fd.append('file', fileEl.files[0]);
+    fd.append('tempo', tempoEl.value || '120');
+    fd.append('quantize', quantizeEl.checked ? '1' : '0');
+
+    let jobId;
+    try {
+      const res = await fetch('api/analyze', { method: 'POST', body: fd, credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setStatus(data.detail || 'Upload failed.', true); reset(true); return; }
+      jobId = data.job_id;
+    } catch {
+      setStatus('Network error. Please try again.', true);
+      reset(true);
+      return;
+    }
+
+    setStatus('Queued...');
+    polling = setInterval(() => poll(jobId), 1500);
+    poll(jobId);
+  });
+
+  async function poll(jobId) {
+    let data;
+    try {
+      const res = await fetch('api/jobs/' + encodeURIComponent(jobId), { credentials: 'include' });
+      if (!res.ok) { setStatus('Lost track of the job. Please try again.', true); reset(true); return; }
+      data = await res.json();
+    } catch {
+      return; // transient; keep polling
+    }
+
+    if (data.status === 'queued') {
+      const ahead = data.ahead || 0;
+      setStatus(ahead > 0
+        ? 'In queue - ' + ahead + ' job' + (ahead === 1 ? '' : 's') + ' ahead of you...'
+        : 'In queue - you are next...');
+    } else if (data.status === 'processing') {
+      setStatus('Analyzing audio...');
+    } else if (data.status === 'done') {
+      reset(true);
+      setStatus('Done - ' + (data.note_count || 0) + ' notes transcribed.');
+      downloadBtn.href = 'api/jobs/' + encodeURIComponent(jobId) + '/download';
+      resultEl.classList.remove('hidden');
+    } else if (data.status === 'error') {
+      reset(true);
+      setStatus(data.error || 'Transcription failed.', true);
+    }
+  }
+})();
+</script>
+</body>
+</html>

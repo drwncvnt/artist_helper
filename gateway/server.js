@@ -22,6 +22,7 @@ const TOOLS = [
   { slug: 'promo', name: 'Promo Cards', desc: 'Release promo images', icon: 'PC', target: process.env.PROMO_URL },
   { slug: 'beats', name: 'Beat Share', desc: 'Private audio cloud - share demos by link', icon: 'BS', target: process.env.BEATS_URL },
   { slug: 'midi', name: 'MIDI Chaos', desc: 'Generative MIDI sequencer - scales, engines & live preview', icon: 'MC', target: process.env.MIDI_URL },
+  { slug: 'transcribe', name: 'Audio to MIDI (beta)', desc: 'Transcribe an audio clip into a MIDI file', icon: 'AM', target: process.env.TRANSCRIBE_URL },
 ];
 const enabledTools = TOOLS.filter((t) => !!t.target);
 

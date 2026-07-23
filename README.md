@@ -2,7 +2,7 @@
 
 A small suite of **creative tools for artists**, unified behind one account. Sign in once, every tool just works.
 
-The platform bundles four tools that used to be separate apps:
+The platform bundles five tools, most of which used to be separate apps:
 
 | Tool | What it does | Stack |
 |------|--------------|-------|
@@ -10,6 +10,7 @@ The platform bundles four tools that used to be separate apps:
 | **Promo Cards** | Generate 1080×1920 release promo cards from a cover | Flask + Pillow |
 | **Beat Share** | Private audio cloud - keep demos/beats private or public, share any track by link (no account needed to listen) | FastAPI + React |
 | **MIDI Chaos** | Generative MIDI sequencer - pick key/scale, engine (random-walk, euclidean, arpeggio, chaos), density, swing & seed; preview in-browser, download `.mid` | Flask + mido |
+| **Audio to MIDI** | Transcribe an audio clip to MIDI at a chosen tempo (optionally quantized). Capped at two concurrent analyses; extra requests wait in a queue | FastAPI + basic-pitch |
 
 
 
@@ -20,15 +21,15 @@ outside world. The gateway verifies the session and reverse-proxies each tool at
 sub-path; the tools themselves are never reachable directly.
 
 ```
-                          ┌─────────────────────────────────────────┐
+                          ┌──────────────────────────────────────────┐
    browser ──HTTPS──▶ gateway (public)                               │
                           │  • session gate (JWT cookie)             │
                           │  • reverse proxy /photo /promo /beats …  │
                           │  • injects trusted X-Auth-* identity     │
-                          └───┬───────┬───────┬───────┬───────┬──────┘
-                              │       │       │       │       │
-                         accounts   photo   promo   beats   midi   (internal only)
-                              │
+                          └──┬──────┬──────┬──────┬──────┬──────┬────┘
+                             │      │      │      │      │      │
+                        accounts  photo  promo  beats  midi  transcribe   (internal only)
+                             │
                           Postgres
 ```
 
@@ -39,8 +40,9 @@ sub-path; the tools themselves are never reachable directly.
 - **accounts** (Node/Express + Postgres) - the only service that owns users and
   passwords. Registers/authenticates users (bcrypt) and issues the JWT session cookie
   shared across the whole platform. Holds the `plan` field for future subscriptions.
-- **photo / promo / beats / midi** - the tools. Each was ported from its original
-  standalone app with its own login removed; they trust the gateway-injected identity.
+- **photo / promo / beats / midi / transcribe** - the tools. Each trusts the
+  gateway-injected identity instead of running its own login. `transcribe` also caps
+  itself at two concurrent analyses and queues the rest.
 
 A tool only appears (and becomes routable) when its upstream URL is configured in the
 gateway, so tools can be enabled one at a time.
@@ -62,7 +64,7 @@ docker compose up -d --build
 ```
 
 Then open <http://localhost:4000>. Create an account and you land on the hub with all
-four tools.
+the tools.
 
 For a real deployment, terminate TLS in front of the gateway (e.g. a reverse proxy /
 Let’s Encrypt) and set `COOKIE_SECURE=true` in `.env`.
@@ -79,6 +81,8 @@ All configuration is via `.env` (see `.env.example` for the full list):
 | `COOKIE_SECURE` | `true` for any HTTPS deployment; `false` only for local HTTP |
 | `SESSION_TTL_SECONDS` | Session lifetime (default 30 days) |
 | `BEATS_MAX_UPLOAD_MB` | Upload cap for Beat Share (default 200) |
+| `TRANSCRIBE_MAX_UPLOAD_MB` | Upload cap for Audio to MIDI (default 25) |
+| `TRANSCRIBE_MAX_DURATION_SECONDS` | Clip length cap for Audio to MIDI (default 60) |
 | `GATEWAY_PORT` | Host port the gateway is published on (default 4000) |
 
 ## Repository layout
@@ -91,6 +95,7 @@ photo/      Photo Editor  (static WebGL app)
 promo/      Promo Cards   (Flask)
 beats/      Beat Share    (FastAPI backend + React frontend, one container)
 midi/       MIDI Chaos    (Flask; app.py + generator.py music core)
+transcribe/ Audio to MIDI (FastAPI + basic-pitch; 2-worker queue)
 docker-compose.yml
 ```
 
