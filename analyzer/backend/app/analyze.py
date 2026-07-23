@@ -52,10 +52,20 @@ def analyze(path: str) -> dict:
     if y.size == 0:
         raise ValueError("Audio file has no samples.")
 
-    tempo, _beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+    # Harmonic-percussive source separation: sustained tonal content (chords,
+    # bass, vocals) and transient content (kicks, snares, hats) get analyzed
+    # separately below because each one only helps the metric it's suited
+    # for and actively hurts the other - percussive transients smear pitch-
+    # class energy and bias key detection, while sustained harmonic content
+    # (long pads, held bass notes, reverb tails) blurs the onset envelope and
+    # biases beat tracking. Splitting them first is standard MIR practice for
+    # both tempo and key estimation.
+    y_harmonic, y_percussive = librosa.effects.hpss(y)
+
+    tempo, _beat_frames = librosa.beat.beat_track(y=y_percussive, sr=sr)
     bpm = float(np.atleast_1d(tempo)[0])
 
-    key, key_confidence = _detect_key(y, sr)
+    key, key_confidence = _detect_key(y_harmonic, sr)
 
     meter = pyloudnorm.Meter(sr)
     lufs = float(meter.integrated_loudness(y))

@@ -11,31 +11,77 @@
 <body>
 <div class="window window--full">
   <div class="titlebar">
-    <div class="titlebar-icon"></div>
+    <div class="titlebar-icon titlebar-icon--brand"></div>
     <span class="titlebar-text">Artist Helper</span>
     <div class="titlebar-buttons">
-      <button class="win-btn" tabindex="-1">_</button>
-      <button class="win-btn" tabindex="-1">&#9633;</button>
-      <button class="win-btn win-btn-close" tabindex="-1">X</button>
+      <button class="win-btn" tabindex="-1" aria-hidden="true">_</button>
+      <button class="win-btn" tabindex="-1" aria-hidden="true">&#9633;</button>
+      <button class="win-btn win-btn-close" tabindex="-1" aria-hidden="true">X</button>
     </div>
   </div>
 
-  <div class="menubar">
-    <span role="button" tabindex="0" data-platform-help>Help</span>
-    <span role="button" tabindex="0" data-platform-aboba>aboba</span>
+  <div class="menubar" id="menubar">
+    <div class="menu" data-menu="file">
+      <button class="menu-trigger" data-menu-trigger aria-haspopup="true" aria-expanded="false">File</button>
+      <div class="menu-dropdown" role="menu" aria-label="File" hidden data-menu-dropdown>
+        <a class="menu-item" role="menuitem" href="/">
+          <img class="menu-item-icon" src="/public/icons/nav-home.png" alt="" />Home
+        </a>
+        <div class="menu-separator" role="separator"></div>
+        <button type="button" class="menu-item" role="menuitem" data-action="sign-out">
+          <img class="menu-item-icon" src="/public/icons/action-logout.png" alt="" />Sign out
+        </button>
+      </div>
+    </div>
+
+    <div class="menu" data-menu="view">
+      <button class="menu-trigger" data-menu-trigger aria-haspopup="true" aria-expanded="false">View</button>
+      <div class="menu-dropdown" role="menu" aria-label="View" hidden data-menu-dropdown>
+        <button type="button" class="menu-item" role="menuitem" data-action="refresh">
+          <img class="menu-item-icon" src="/public/icons/action-refresh.png" alt="" />Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="menu" data-menu="tools">
+      <button class="menu-trigger" data-menu-trigger aria-haspopup="true" aria-expanded="false">Tools</button>
+      <div class="menu-dropdown" role="menu" aria-label="Tools" hidden data-menu-dropdown id="toolsMenuDropdown">
+        <span class="menu-item" role="none" style="color:#505050;">Loading...</span>
+      </div>
+    </div>
+
+    <div class="menu" data-menu="help">
+      <button class="menu-trigger" data-menu-trigger aria-haspopup="true" aria-expanded="false">Help</button>
+      <div class="menu-dropdown" role="menu" aria-label="Help" hidden data-menu-dropdown>
+        <button type="button" class="menu-item" role="menuitem" data-platform-help>
+          <img class="menu-item-icon" src="/public/icons/menu-help.png" alt="" />Feedback &amp; bug report
+        </button>
+        <div class="menu-separator" role="separator"></div>
+        <button type="button" class="menu-item" role="menuitem" data-platform-aboba>
+          <img class="menu-item-icon menu-item-icon--blank" src="/public/icons/menu-help.png" alt="" />About
+        </button>
+      </div>
+    </div>
+
     <div class="auth-status" id="authStatus"></div>
   </div>
 
   <div class="hub">
-    <h1 style="font-size:16px; margin:8px 0 2px;">Tools for artists</h1>
-    <p class="hint" style="margin-bottom:8px;">Pick a tool to get started. Your account works across all of them. <span style="color:#303030;">by drwncvnt</span></p>
-    <div class="groupbox">
-      <div class="hub-grid" id="hubGrid"></div>
+    <div class="hub-header">
+      <img src="/public/icons/logo-media-center.png" alt="" />
+      <div>
+        <h1>Tools for artists</h1>
+        <p class="hint">Pick a tool to get started. Your account works across all of them.</p>
+        <p class="hint attribution">by drwncvnt</p>
+      </div>
     </div>
+    <div class="hub-grid" id="hubGrid"></div>
   </div>
 
   <div class="statusbar">
-    <span class="status-field" id="statusText">Ready.</span>
+    <span class="status-field" id="statusText"><img src="/public/icons/status-info.png" alt="" />Ready.</span>
+    <span class="status-field status-field--auto" id="statusUser"></span>
+    <span class="status-field status-field--auto" id="statusPlan"></span>
     <a class="status-link" href="https://github.com/drwncvnt/artist_helper" target="_blank" rel="noopener">
       open source - github.com/drwncvnt/artist_helper
     </a>
@@ -47,6 +93,9 @@
   const authStatus = document.getElementById('authStatus');
   const hubGrid = document.getElementById('hubGrid');
   const statusText = document.getElementById('statusText');
+  const statusUser = document.getElementById('statusUser');
+  const statusPlan = document.getElementById('statusPlan');
+  const toolsMenuDropdown = document.getElementById('toolsMenuDropdown');
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -55,38 +104,76 @@
 
   function renderUser(user) {
     authStatus.innerHTML = '';
+
+    const icon = document.createElement('img');
+    icon.className = 'auth-icon';
+    icon.src = '/public/icons/menu-account.png';
+    icon.alt = '';
+
     const name = document.createElement('span');
+    name.className = 'auth-name';
     name.textContent = user.username;
+
     const plan = document.createElement('span');
     plan.className = 'badge' + (user.plan === 'pro' ? ' badge-pro' : '');
     plan.textContent = user.plan;
+
     const upgrade = document.createElement('button');
     upgrade.className = 'btn small';
+    upgrade.type = 'button';
     upgrade.textContent = 'Upgrade - Soon';
     upgrade.disabled = true;
+    upgrade.setAttribute('aria-disabled', 'true');
     upgrade.title = 'Subscriptions are coming soon.';
+
     const out = document.createElement('button');
     out.className = 'btn small';
+    out.type = 'button';
     out.textContent = 'Sign out';
     out.addEventListener('click', logout);
-    authStatus.append(name, plan, upgrade, out);
+
+    authStatus.append(icon, name, plan, upgrade, out);
+    statusUser.textContent = 'Signed in as ' + user.username;
+    statusPlan.textContent = user.plan + ' plan';
   }
 
   function renderTiles(tools) {
     hubGrid.innerHTML = '';
+    toolsMenuDropdown.innerHTML = '';
+
     tools.forEach((t) => {
       const enabled = t.enabled;
+
+      // Main launcher row.
       const tile = document.createElement(enabled ? 'a' : 'div');
       tile.className = 'tile' + (enabled ? '' : ' tile-disabled');
       if (enabled) tile.href = '/' + t.slug + '/';
+      if (!enabled) tile.setAttribute('aria-disabled', 'true');
       tile.innerHTML =
-        '<div class="tile-icon">' + t.icon + '</div>' +
-        '<div class="tile-name">' + t.name + '</div>' +
-        '<div class="tile-desc">' + (enabled ? t.desc : 'Soon') + '</div>';
+        '<div class="tile-icon"><img src="' + t.icon + '" alt="" /></div>' +
+        '<div class="tile-text">' +
+          '<div class="tile-name">' + t.name + '</div>' +
+          '<div class="tile-desc">' + (enabled ? t.desc : 'Soon') + '</div>' +
+        '</div>';
       hubGrid.appendChild(tile);
+
+      // Matching entry in the Tools menu (same data, no separate source of truth).
+      if (enabled) {
+        const item = document.createElement('a');
+        item.className = 'menu-item';
+        item.setAttribute('role', 'menuitem');
+        item.href = '/' + t.slug + '/';
+        item.innerHTML = '<img class="menu-item-icon" src="' + t.icon + '" alt="" />' + t.name;
+        toolsMenuDropdown.appendChild(item);
+      }
     });
+
+    if (!toolsMenuDropdown.children.length) {
+      toolsMenuDropdown.innerHTML = '<span class="menu-item" role="none" style="color:#505050;">No tools available</span>';
+    }
+
     const live = tools.filter((t) => t.enabled).length;
-    statusText.textContent = live + ' tool' + (live === 1 ? '' : 's') + ' available.';
+    statusText.lastChild.textContent = live + ' tool' + (live === 1 ? '' : 's') + ' available.';
   }
 
   Promise.all([
@@ -97,7 +184,107 @@
     renderUser(me.user);
     renderTiles(reg.tools);
   }).catch(() => {
-    statusText.textContent = 'Failed to load. Refresh to retry.';
+    statusText.lastChild.textContent = 'Failed to load. Refresh to retry.';
+  });
+
+  // ---- Classic dropdown menu bar (File / View / Tools / Help) ----------
+  const menus = Array.from(document.querySelectorAll('[data-menu]'));
+
+  function closeMenu(menu) {
+    const trigger = menu.querySelector('[data-menu-trigger]');
+    const dropdown = menu.querySelector('[data-menu-dropdown]');
+    menu.classList.remove('open');
+    trigger.setAttribute('aria-expanded', 'false');
+    dropdown.hidden = true;
+  }
+  function closeAllMenus() {
+    menus.forEach(closeMenu);
+  }
+  function openMenu(menu) {
+    closeAllMenus();
+    const trigger = menu.querySelector('[data-menu-trigger]');
+    const dropdown = menu.querySelector('[data-menu-dropdown]');
+    menu.classList.add('open');
+    trigger.setAttribute('aria-expanded', 'true');
+    dropdown.hidden = false;
+  }
+  function menuItems(menu) {
+    return Array.from(menu.querySelectorAll('.menu-item'))
+      .filter((el) => el.getAttribute('role') === 'menuitem');
+  }
+
+  menus.forEach((menu) => {
+    const trigger = menu.querySelector('[data-menu-trigger]');
+
+    trigger.addEventListener('click', () => {
+      if (menu.classList.contains('open')) {
+        closeMenu(menu);
+      } else {
+        openMenu(menu);
+      }
+    });
+
+    // Classic menu-bar behavior: once any menu is open, moving the mouse over
+    // another top-level item switches straight to it instead of requiring
+    // another click.
+    trigger.addEventListener('mouseenter', () => {
+      const anyOpen = menus.some((m) => m.classList.contains('open'));
+      if (anyOpen && !menu.classList.contains('open')) openMenu(menu);
+    });
+
+    trigger.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openMenu(menu);
+        const items = menuItems(menu);
+        if (items[0]) items[0].focus();
+      }
+    });
+
+    menu.querySelector('[data-menu-dropdown]').addEventListener('keydown', (e) => {
+      const items = menuItems(menu);
+      const currentIndex = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = items[(currentIndex + 1) % items.length];
+        if (next) next.focus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = items[(currentIndex - 1 + items.length) % items.length];
+        if (prev) prev.focus();
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        if (items[0]) items[0].focus();
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        if (items[items.length - 1]) items[items.length - 1].focus();
+      }
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-menu]')) closeAllMenus();
+  });
+  menus.forEach((menu) => {
+    // Tabbing out of a menu (its trigger or one of its items) closes it, so an
+    // open dropdown never lingers once keyboard focus has moved elsewhere.
+    menu.addEventListener('focusout', (e) => {
+      if (!menu.contains(e.relatedTarget)) closeMenu(menu);
+    });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const openMenuEl = menus.find((m) => m.classList.contains('open'));
+    closeAllMenus();
+    if (openMenuEl) openMenuEl.querySelector('[data-menu-trigger]').focus();
+  });
+
+  document.getElementById('menubar').addEventListener('click', (e) => {
+    const actionEl = e.target.closest('[data-action]');
+    if (!actionEl) return;
+    const action = actionEl.dataset.action;
+    if (action === 'sign-out') logout();
+    else if (action === 'refresh') window.location.reload();
   });
 })();
 </script>

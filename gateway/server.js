@@ -17,13 +17,17 @@ fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
 // Tool registry. A tool is "enabled" (routable + a live hub tile) only if its
 // upstream URL env is set, so tools can be brought online one at a time without
 // the gateway trying to proxy to a service that isn't running yet.
+//
+// `icon` is a path under /public/icons (served by the gateway, see the static
+// mount below) to a real local XP-style icon - see public/icons/ for the full
+// set. Every tool gets one; there are no letter-placeholder icons anymore.
 const TOOLS = [
-  { slug: 'photo', name: 'Photo Editor', desc: 'Glitch & retro photo FX', icon: 'PE', target: process.env.PHOTO_URL },
-  { slug: 'promo', name: 'Promo Cards', desc: 'Release promo images', icon: 'PC', target: process.env.PROMO_URL },
-  { slug: 'beats', name: 'Beat Share', desc: 'Private audio cloud - share demos by link', icon: 'BS', target: process.env.BEATS_URL },
-  { slug: 'midi', name: 'MIDI Chaos', desc: 'Generative MIDI sequencer - scales, engines & live preview', icon: 'MC', target: process.env.MIDI_URL },
-  { slug: 'transcribe', name: 'Audio to MIDI (beta)', desc: 'Transcribe an audio clip into a MIDI file', icon: 'AM', target: process.env.TRANSCRIBE_URL },
-  { slug: 'analyzer', name: 'Audio Analyzer (beta)', desc: 'Get BPM and key, plus loudness & level metrics', icon: 'AA', target: process.env.ANALYZER_URL },
+  { slug: 'photo', name: 'Photo Editor', desc: 'Glitch & retro photo FX', icon: '/public/icons/tool-photo-editor.png', target: process.env.PHOTO_URL },
+  { slug: 'promo', name: 'Promo Cards', desc: 'Release promo images', icon: '/public/icons/tool-promo-cards.png', target: process.env.PROMO_URL },
+  { slug: 'beats', name: 'Beat Share', desc: 'Private audio cloud - share demos by link', icon: '/public/icons/tool-beat-share.png', target: process.env.BEATS_URL },
+  { slug: 'midi', name: 'MIDI Chaos', desc: 'Generative MIDI sequencer - scales, engines & live preview', icon: '/public/icons/tool-midi-chaos.png', target: process.env.MIDI_URL },
+  { slug: 'transcribe', name: 'Audio to MIDI (beta)', desc: 'Transcribe an audio clip into a MIDI file', icon: '/public/icons/tool-audio-to-midi.png', target: process.env.TRANSCRIBE_URL },
+  { slug: 'analyzer', name: 'Audio Analyzer (beta)', desc: 'Get BPM and key, plus loudness & level metrics', icon: '/public/icons/tool-audio-analyzer.png', target: process.env.ANALYZER_URL },
 ];
 const enabledTools = TOOLS.filter((t) => !!t.target);
 
@@ -46,11 +50,21 @@ function readSession(req) {
 
 // Shared design system (CSS, JS, and any shared assets). No secrets here, and
 // the login page needs it, so it stays public.
-app.use('/shared', express.static(SHARED_DIR, { maxAge: '1h' }));
+//
+// No maxAge: these files change during active development, and a blind
+// time-based cache means a browser that fetched xp.css/platform-ui.js before
+// an edit keeps using the stale copy - for up to the maxAge window - even
+// though every page's HTML has already moved on to expect the new version,
+// producing exactly the "half old / half new" breakage that maxAge caused
+// once already. express.static still sends ETag/Last-Modified, so an
+// unchanged file is still served as a cheap 304 - we just stop trusting the
+// clock over the actual file content.
+app.use('/shared', express.static(SHARED_DIR));
 
-// Public static assets (e.g. the aboba gif) served to every tool. Public so the
-// login page and all tools can reference them without a session.
-app.use('/public', express.static(PUBASSETS_DIR, { maxAge: '1h' }));
+// Public static assets (e.g. the aboba gif, tool icons) served to every tool.
+// Public so the login page and all tools can reference them without a
+// session. Same caching reasoning as /shared above.
+app.use('/public', express.static(PUBASSETS_DIR));
 
 // Auth API is proxied to the accounts service. pathFilter keeps the original
 // path (/api/auth/login etc.) intact when forwarding.

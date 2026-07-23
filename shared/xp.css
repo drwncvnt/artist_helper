@@ -87,12 +87,20 @@ body {
   font-size: var(--fs-title);
 }
 
+/* Every window gets a real icon by default (Application Window.png, a generic
+   XP window glyph) purely via CSS, so individual tool pages need no markup
+   change to stop showing an empty gray box. The hub overrides this with its
+   own logo via the .titlebar-icon--brand modifier. Decorative: the visible
+   titlebar text already names the window, so this carries no alt text. */
 .titlebar-icon {
-  width: 14px;
-  height: 14px;
-  background: var(--face);
+  width: 16px;
+  height: 16px;
+  background: var(--face) url("/public/icons/logo-app.png") center / contain no-repeat;
   border: 1px solid #000000;
   flex-shrink: 0;
+}
+.titlebar-icon--brand {
+  background-image: url("/public/icons/logo-media-center.png");
 }
 
 .titlebar-text {
@@ -152,6 +160,107 @@ body {
   align-items: center;
   gap: var(--sp-2);
   margin-left: auto;
+  padding-left: var(--sp-3);
+  border-left: 1px solid var(--face-dark);
+}
+.auth-status .auth-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.auth-status .auth-name {
+  font-weight: bold;
+}
+
+/* ------------------------------------------------------------------ *
+ * Dropdown application menu (File / View / Tools / Help)
+ * A real classic menu: click or Enter/Space opens it, hover highlights
+ * items, Escape or an outside click closes it. Used by the hub; other
+ * pages keep the simpler single-action `.menubar span` triggers above.
+ * ------------------------------------------------------------------ */
+.menu {
+  position: relative;
+}
+.menu-trigger {
+  background: none;
+  border: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  padding: 1px 6px;
+  cursor: default;
+}
+.menu-trigger:hover,
+.menu.open > .menu-trigger {
+  background: var(--accent);
+  color: #ffffff;
+}
+.menu-trigger:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -2px;
+}
+.menu.open > .menu-trigger:focus-visible {
+  outline-color: #ffffff;
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 60;
+  min-width: 210px;
+  margin-top: 1px;
+  background: var(--field-bg);
+  border: 1px solid #000000;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.35);
+  padding: 2px;
+}
+.menu-dropdown[hidden] {
+  display: none;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 4px var(--sp-3) 4px 6px;
+  background: none;
+  border: none;
+  font: inherit;
+  color: #000000;
+  text-align: left;
+  text-decoration: none;
+  cursor: default;
+}
+.menu-item .menu-item-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+.menu-item .menu-item-icon--blank {
+  visibility: hidden;
+}
+.menu-item:hover,
+.menu-item:focus-visible {
+  background: var(--accent);
+  color: #ffffff;
+}
+.menu-item:focus-visible {
+  outline: 1px dotted #ffffff;
+  outline-offset: -3px;
+}
+.menu-item:disabled,
+.menu-item[aria-disabled="true"] {
+  color: var(--face-dark);
+  background: none;
+  cursor: default;
+}
+.menu-separator {
+  height: 0;
+  margin: 3px 2px;
+  border-top: 1px solid var(--face-dark);
+  border-bottom: 1px solid var(--highlight);
 }
 
 /* Status bar */
@@ -170,6 +279,20 @@ body {
   padding: 2px var(--sp-2);
   flex: 1;
   min-width: 80px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+/* A segment sized to its content instead of stretching (e.g. plan/tool count
+   segments in a multi-panel status bar). */
+.statusbar .status-field--auto {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.statusbar .status-field img {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 .status-link {
   border: 1px inset var(--face);
@@ -377,70 +500,136 @@ a.link {
 }
 
 /* ------------------------------------------------------------------ *
- * Hub / launcher grid (the dashboard of tool "icons")
+ * Hub / launcher (the tool-picker workspace)
  * ------------------------------------------------------------------ */
+/* The hub fills the remaining space between the menubar and status bar, and
+   centers its (short, six-tool) content within it, so leftover space on a
+   tall viewport reads as a balanced composition rather than a page that just
+   stops partway down. "safe center" falls back to top-alignment if the
+   content ever grows taller than the viewport, so nothing gets pushed
+   off-screen above the fold. */
 .hub {
-  max-width: 720px;
-  margin: var(--sp-6) auto;
-  padding: 0 var(--sp-4);
-}
-.hub-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: var(--sp-4);
-  padding: var(--sp-4);
-}
-.tile {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  justify-content: safe center;
+  max-width: 980px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--sp-5);
+}
+
+.hub-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--face-dark);
+}
+.hub-header img {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.hub-header h1 {
+  font-size: 13px;
+  margin: 0;
+}
+.hub-header p {
+  margin: 3px 0 0;
+}
+.hub-header .attribution {
+  color: #505050;
+}
+
+/* Explorer / Control-Panel style applet list: a two-column grid of wide, short
+   rows (icon left, name + description right) instead of a tall single column
+   of near-identical square tiles. */
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3);
+}
+@media (max-width: 720px) {
+  .hub-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tile {
+  display: flex;
   align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-4) var(--sp-3);
-  background: var(--face);
-  border: 2px outset var(--face);
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+  min-height: 64px;
+  background: var(--field-bg);
+  border: 1px solid var(--face-dark);
   color: #000000;
   text-decoration: none;
-  text-align: center;
+  text-align: left;
   cursor: default;
+  transition: background-color 0.08s linear, border-color 0.08s linear;
 }
 .tile:hover {
-  background: var(--face-light);
+  background: #eaf2ff;
+  border-color: var(--accent);
 }
 .tile:active {
-  border-style: inset;
+  background: #d7e6ff;
 }
 .tile:focus-visible {
   outline: 1px dotted var(--accent);
-  outline-offset: 2px;
+  outline-offset: -3px;
+  background: #eaf2ff;
 }
 .tile .tile-icon {
   width: 48px;
   height: 48px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--face-dark);
-  background: var(--field-bg);
-  font-family: var(--font-ui);
-  font-size: 15px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
-  color: var(--accent);
-  line-height: 1;
+}
+.tile .tile-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.tile .tile-text {
+  min-width: 0;
 }
 .tile .tile-name {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
   font-weight: bold;
 }
 .tile .tile-desc {
   font-size: 10px;
   color: #303030;
+  margin-top: 2px;
 }
 .tile.tile-disabled {
-  opacity: 0.6;
+  opacity: 0.65;
+}
+.tile.tile-disabled:hover {
+  background: var(--field-bg);
+  border-color: var(--face-dark);
 }
 
 @media (max-width: 640px) {
   .hub {
-    margin: var(--sp-3) auto;
+    padding: var(--sp-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.001ms !important;
   }
 }
