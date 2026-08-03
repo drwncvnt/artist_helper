@@ -89,6 +89,31 @@ services:
       - analyzer-uploads:/data/uploads
     restart: unless-stopped
 
+  # Photo background removal (rembg, ONNX/CPU). At most 2 users' images are
+  # processed at once (in-process FIFO queue, see MAX_CONCURRENT_JOBS in
+  # main.py); everyone else waits their turn. Capped to 2 CPUs since this is
+  # the heaviest per-request tool on the box; OMP_NUM_THREADS matches that cap
+  # so onnxruntime doesn't spawn more threads than there are real cores to run
+  # them on.
+  bgremove:
+    build: ./bgremove
+    container_name: dp_bgremove
+    environment:
+      REMBG_MODEL: ${BGREMOVE_MODEL:-isnet-general-use}
+      MAX_FILE_SIZE_MB: ${BGREMOVE_MAX_UPLOAD_MB:-15}
+      MAX_IMAGE_PIXELS: ${BGREMOVE_MAX_IMAGE_PIXELS:-25000000}
+      MAX_CONCURRENT_JOBS: ${BGREMOVE_MAX_CONCURRENT_JOBS:-2}
+      MAX_QUEUE_WAITING: ${BGREMOVE_MAX_QUEUE_WAITING:-20}
+      OMP_NUM_THREADS: "2"
+    volumes:
+      - bgremove-models:/models
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 3g
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     container_name: dp_gateway
@@ -104,6 +129,7 @@ services:
       BEATS_URL: http://beats:8000
       TRANSCRIBE_URL: http://transcribe:8000
       ANALYZER_URL: http://analyzer:8000
+      BGREMOVE_URL: http://bgremove:8000
     volumes:
       - ./shared:/app/shared:ro
       - ./public:/app/pubassets:ro
@@ -116,6 +142,7 @@ services:
       - beats
       - transcribe
       - analyzer
+      - bgremove
     ports:
       - "${GATEWAY_PORT:-4000}:4000"
     restart: unless-stopped
@@ -126,3 +153,4 @@ volumes:
   beats-db:
   transcribe-work:
   analyzer-uploads:
+  bgremove-models:

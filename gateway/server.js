@@ -28,6 +28,7 @@ const TOOLS = [
   { slug: 'midi', name: 'MIDI Chaos', desc: 'Generative MIDI sequencer - scales, engines & live preview', icon: '/public/icons/tool-midi-chaos.png', target: process.env.MIDI_URL },
   { slug: 'transcribe', name: 'Audio to MIDI (beta)', desc: 'Transcribe an audio clip into a MIDI file', icon: '/public/icons/tool-audio-to-midi.png', target: process.env.TRANSCRIBE_URL },
   { slug: 'analyzer', name: 'Audio Analyzer (beta)', desc: 'Get BPM and key, plus loudness & level metrics', icon: '/public/icons/tool-audio-analyzer.png', target: process.env.ANALYZER_URL },
+  { slug: 'bgremove', name: 'Background Remover', desc: 'Cut a photo’s background out to transparent PNG', icon: '/public/icons/tool-bg-remove.png', target: process.env.BGREMOVE_URL },
 ];
 const enabledTools = TOOLS.filter((t) => !!t.target);
 
