@@ -10,17 +10,19 @@
 <script src="/shared/platform-ui.js" defer></script>
 <style>
   body { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; }
-  .a2m { width: 440px; max-width: 100%; margin: 24px 12px; }
+  .a2m { width: 460px; max-width: 100%; margin: 24px 12px; }
   .a2m .body { padding: 12px; }
   .a2m .field { margin-bottom: 10px; }
   .a2m .row { display: flex; gap: 10px; }
   .a2m .row .field { flex: 1; }
   .status {
     border: 1px inset var(--face); background: var(--field-bg);
-    padding: 8px; margin-top: 10px; font-size: 11px; min-height: 34px;
+    padding: 6px 8px; margin-top: 10px; font-size: 11px; min-height: 28px;
+    display: flex; align-items: center; justify-content: space-between;
   }
   .status.err { color: var(--danger); }
-  .spin { display: inline-block; }
+  .file-chosen-text { font-weight: bold; margin-top: 4px; color: var(--accent); }
+  .checkline { display: flex; align-items: center; gap: 8px; font-size: 11px; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -47,29 +49,44 @@
 
       <form id="form" class="groupbox">
         <div class="field">
-          <label class="field-label" for="file">Audio clip</label>
-          <input type="file" id="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aac" required />
+          <div class="upload-zone" id="dropzone">
+            <input type="file" id="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aac" style="display:none;" required />
+            <div class="upload-zone-text">Click to choose an audio clip or drag &amp; drop here</div>
+            <div class="upload-zone-hint">WAV, MP3, FLAC, OGG, M4A, AAC (max 25MB, up to 60s)</div>
+            <div class="file-chosen-text" id="fileName"></div>
+          </div>
         </div>
         <div class="row">
           <div class="field">
-            <label class="field-label" for="tempo">Tempo (BPM)</label>
+            <label class="field-label" for="tempo">Target Tempo (BPM)</label>
             <input type="number" id="tempo" value="120" min="20" max="300" step="1" required />
           </div>
         </div>
         <label class="checkline">
           <span class="switch"><input type="checkbox" id="quantize" /><span></span></span>
-          <span>Quantize notes to the tempo grid (1/16)</span>
+          <span>Quantize transcribed notes to 1/16 grid</span>
         </label>
         <div class="dialog-actions" style="margin-top: 12px;">
-          <button type="submit" class="btn primary" id="submitBtn">Transcribe</button>
+          <button type="submit" class="btn primary" id="submitBtn">Start Transcription</button>
         </div>
       </form>
 
-      <div class="status hint" id="status">Ready.</div>
+      <div class="xp-progress hidden" id="progressWrap" style="margin-top: 10px;">
+        <div class="xp-progress-bar xp-progress-bar--animated xp-progress-bar--indeterminate"></div>
+      </div>
+
+      <div class="status hint" id="status">
+        <span id="statusText">Ready.</span>
+      </div>
 
       <div id="result" class="hidden" style="margin-top: 10px;">
-        <a class="btn primary block" id="downloadBtn" href="#">Download .mid</a>
+        <a class="btn primary block" id="downloadBtn" href="#" style="text-align:center; text-decoration:none; padding: 6px 12px;">Download .mid</a>
       </div>
+    </div>
+
+    <div class="statusbar">
+      <span class="status-field" id="sbStatus">Audio to MIDI · Ready</span>
+      <span class="status-field status-field--auto">v0.3</span>
     </div>
   </div>
 </div>
@@ -78,31 +95,64 @@
 (() => {
   const form = document.getElementById('form');
   const fileEl = document.getElementById('file');
+  const dropzone = document.getElementById('dropzone');
+  const fileNameEl = document.getElementById('fileName');
   const tempoEl = document.getElementById('tempo');
   const quantizeEl = document.getElementById('quantize');
   const submitBtn = document.getElementById('submitBtn');
+  const progressWrap = document.getElementById('progressWrap');
   const statusEl = document.getElementById('status');
+  const statusText = document.getElementById('statusText');
+  const sbStatus = document.getElementById('sbStatus');
   const resultEl = document.getElementById('result');
   const downloadBtn = document.getElementById('downloadBtn');
 
   let polling = null;
 
+  dropzone.addEventListener('click', () => fileEl.click());
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+      fileEl.files = e.dataTransfer.files;
+      updateFileDisplay();
+    }
+  });
+
+  fileEl.addEventListener('change', updateFileDisplay);
+
+  function updateFileDisplay() {
+    if (fileEl.files && fileEl.files[0]) {
+      fileNameEl.textContent = 'Selected: ' + fileEl.files[0].name + ' (' + (fileEl.files[0].size / (1024 * 1024)).toFixed(2) + ' MB)';
+    } else {
+      fileNameEl.textContent = '';
+    }
+  }
+
   function setStatus(text, isError) {
-    statusEl.textContent = text;
+    statusText.textContent = text;
     statusEl.classList.toggle('err', !!isError);
+    sbStatus.textContent = isError ? 'Error: ' + text : 'Audio to MIDI · ' + text;
   }
 
   function reset(enable) {
     submitBtn.disabled = !enable;
+    if (enable) progressWrap.classList.add('hidden');
+    else progressWrap.classList.remove('hidden');
     if (polling) { clearInterval(polling); polling = null; }
   }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!fileEl.files[0]) return;
+    if (!fileEl.files[0]) {
+      setStatus('Please select an audio file first.', true);
+      return;
+    }
     resultEl.classList.add('hidden');
     reset(false);
-    setStatus('Uploading...');
+    setStatus('Uploading audio file...');
 
     const fd = new FormData();
     fd.append('file', fileEl.files[0]);
@@ -142,12 +192,13 @@
         ? 'In queue - ' + ahead + ' job' + (ahead === 1 ? '' : 's') + ' ahead of you...'
         : 'In queue - you are next...');
     } else if (data.status === 'processing') {
-      setStatus('Analyzing audio...');
+      setStatus('Transcribing audio notes into MIDI...');
     } else if (data.status === 'done') {
       reset(true);
       setStatus('Done - ' + (data.note_count || 0) + ' notes transcribed.');
       downloadBtn.href = 'api/jobs/' + encodeURIComponent(jobId) + '/download';
       resultEl.classList.remove('hidden');
+      if (window.platformToast) window.platformToast('Transcription ready for download!', 'info');
     } else if (data.status === 'error') {
       reset(true);
       setStatus(data.error || 'Transcription failed.', true);

@@ -17,16 +17,17 @@
   --highlight: #ffffff;
   --shadow: #404040;
 
-  /* Accents */
-  --titlebar-from: #0a246a;
-  --titlebar-to: #a6caf0;
+  /* Accents - Red Windows XP (Burgundy / Crimson Royale) */
+  --titlebar-from: #7a0e1c;
+  --titlebar-to: #d43b4c;
   --titlebar-text: #ffffff;
-  --accent: #000080;
+  --accent: #8b0e1d;
   --field-bg: #ffffff;
-  --danger: #a80000;
+  --danger: #b30000;
 
   /* Desktop backdrop */
-  --desktop: #245edb; /* the classic XP "Bliss" blue, calmer than #008080 */
+  --desktop: #6b121d; /* rich Windows XP Burgundy / Ruby */
+  --wallpaper: url('/public/img.jfif');
 
   /* Spacing scale - consistent rhythm across every module */
   --sp-1: 4px;
@@ -53,7 +54,12 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background: var(--desktop);
+  background-color: var(--desktop);
+  background-image: var(--wallpaper);
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  background-attachment: fixed;
   color: #000000;
   font-family: var(--font-ui);
   font-size: var(--fs);
@@ -126,12 +132,30 @@ body {
   padding: 0;
   color: #000000;
   cursor: default;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.win-btn:active {
+.win-btn:hover:not(:disabled) {
+  background: #b51c2d;
+  border-color: #780d19;
+  color: #ffffff;
+}
+.win-btn:active:not(:disabled) {
   border-style: inset;
+  background: #6e0915;
 }
 .win-btn-close {
   font-weight: bold;
+}
+.win-btn-close:hover:not(:disabled) {
+  background: #e62839;
+  border-color: #9c1320;
+  color: #ffffff;
+}
+.win-btn-close:active:not(:disabled) {
+  border-style: inset;
+  background: #870b16;
 }
 
 /* Menu bar (File / Edit / ...) */
@@ -305,6 +329,16 @@ body {
 .status-link:hover {
   text-decoration: underline;
 }
+.titlebar .status-link {
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(0, 0, 0, 0.15);
+  margin-left: auto;
+}
+.titlebar .status-link:hover {
+  background: rgba(255, 255, 255, 0.2);
+  text-decoration: none;
+}
 
 /* ------------------------------------------------------------------ *
  * Buttons
@@ -376,6 +410,51 @@ select:focus-visible,
 textarea:focus-visible {
   outline: 1px dotted var(--accent);
   outline-offset: 1px;
+}
+
+/* Classic Windows XP range slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: default;
+  height: 20px;
+  margin: 2px 0;
+}
+input[type="range"]:focus {
+  outline: none;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--face);
+  border: 1px inset var(--face);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 18px;
+  background: var(--face);
+  border: 2px outset var(--face);
+  margin-top: -8px;
+  cursor: default;
+}
+input[type="range"]::-webkit-slider-thumb:active {
+  border-style: inset;
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: var(--face);
+  border: 1px inset var(--face);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 8px;
+  height: 16px;
+  background: var(--face);
+  border: 2px outset var(--face);
+  cursor: default;
+}
+input[type="range"]::-moz-range-thumb:active {
+  border-style: inset;
 }
 
 /* Classic checkbox rendered as an inset tick box. */
@@ -576,16 +655,16 @@ a.link {
   transition: background-color 0.08s linear, border-color 0.08s linear;
 }
 .tile:hover {
-  background: #eaf2ff;
+  background: #fdecee;
   border-color: var(--accent);
 }
 .tile:active {
-  background: #d7e6ff;
+  background: #fbd5d9;
 }
 .tile:focus-visible {
   outline: 1px dotted var(--accent);
   outline-offset: -3px;
-  background: #eaf2ff;
+  background: #fdecee;
 }
 .tile .tile-icon {
   width: 48px;
@@ -622,14 +701,180 @@ a.link {
   border-color: var(--face-dark);
 }
 
+/* ------------------------------------------------------------------ *
+ * Classic Windows XP 3D-bevel scrollbars
+ * ------------------------------------------------------------------ */
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+  background: var(--face-light);
+}
+::-webkit-scrollbar-track {
+  background: var(--face-light);
+  border: 1px inset var(--face);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--face);
+  border: 2px outset var(--face);
+}
+::-webkit-scrollbar-thumb:active {
+  border-style: inset;
+  background: #b0b0b0;
+}
+::-webkit-scrollbar-button {
+  display: block;
+  background: var(--face);
+  border: 1px outset var(--face);
+  width: 16px;
+  height: 16px;
+}
+::-webkit-scrollbar-button:active {
+  border-style: inset;
+}
+
+/* ------------------------------------------------------------------ *
+ * Windows XP Progress Bar
+ * ------------------------------------------------------------------ */
+.xp-progress {
+  height: 18px;
+  background: var(--field-bg);
+  border: 1px inset var(--face);
+  padding: 1px;
+  position: relative;
+  overflow: hidden;
+}
+.xp-progress-bar {
+  height: 100%;
+  background: linear-gradient(180deg, #9ae680 0%, #30b020 50%, #1c7c10 100%);
+  width: 0%;
+  transition: width 0.2s ease-out;
+}
+.xp-progress-bar--animated {
+  background: repeating-linear-gradient(
+    90deg,
+    #32b822,
+    #32b822 10px,
+    #249216 10px,
+    #249216 14px
+  );
+  background-size: 28px 100%;
+  animation: xp-progress-slide 0.8s linear infinite;
+}
+.xp-progress-bar--indeterminate {
+  width: 35% !important;
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  animation: xp-progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes xp-progress-slide {
+  0% { background-position: 0 0; }
+  100% { background-position: 28px 0; }
+}
+@keyframes xp-progress-indeterminate {
+  0% { left: -35%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Retro Sunken Upload Zone
+ * ------------------------------------------------------------------ */
+.upload-zone {
+  border: 2px dashed var(--face-dark);
+  background: var(--field-bg);
+  padding: var(--sp-4);
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.1s linear, border-color 0.1s linear;
+}
+.upload-zone:hover,
+.upload-zone.dragover {
+  background: #fdecee;
+  border-color: var(--accent);
+}
+.upload-zone .upload-zone-icon {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto var(--sp-2);
+  display: block;
+}
+.upload-zone .upload-zone-text {
+  font-size: var(--fs);
+  color: #000000;
+}
+.upload-zone .upload-zone-hint {
+  font-size: 10px;
+  color: #606060;
+  margin-top: 2px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Retro Balloon / Toast Notification
+ * ------------------------------------------------------------------ */
+.xp-toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.xp-toast {
+  pointer-events: auto;
+  min-width: 200px;
+  max-width: 320px;
+  background: #ffffe1;
+  color: #000000;
+  border: 1px solid #000000;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.4);
+  padding: 6px 10px;
+  font-size: var(--fs);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  animation: xp-toast-in 0.15s ease-out;
+}
+.xp-toast.xp-toast--error {
+  background: #ffdede;
+  border-color: var(--danger);
+}
+.xp-toast.xp-toast--info {
+  background: #ffffe1;
+}
+@keyframes xp-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-width: 640px) {
   .hub {
     padding: var(--sp-3);
+  }
+  .window--full {
+    height: 100%;
+    min-height: 100vh;
+  }
+  .dialog {
+    width: 100%;
+    margin: 8px;
+  }
+  .titlebar {
+    padding: 4px var(--sp-2);
+  }
+  .win-btn {
+    width: 20px;
+    height: 18px;
+    font-size: 11px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * {
     transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
   }
 }

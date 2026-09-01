@@ -4,10 +4,10 @@
   --highlight: #ffffff;
   --shadow: #404040;
   --black: #000000;
-  --titlebar-from: #0a246a;
-  --titlebar-to: #a6caf0;
+  --titlebar-from: #7a0e1c;
+  --titlebar-to: #d43b4c;
   --field-bg: #ffffff;
-  --accent: #000080;
+  --accent: #8b0e1d;
 }
 
 * {
@@ -21,7 +21,12 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: #008080;
+  background-color: #6b121d;
+  background-image: url('/public/img.jfif');
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  background-attachment: fixed;
   color: #000000;
   font-family: Tahoma, "MS Sans Serif", Geneva, sans-serif;
   font-size: 11px;
@@ -80,12 +85,27 @@ html, body {
   cursor: default;
 }
 
-.win-btn:active {
+.win-btn:hover:not(:disabled) {
+  background: #b51c2d;
+  border-color: #780d19;
+  color: #ffffff;
+}
+.win-btn:active:not(:disabled) {
   border-style: inset;
+  background: #6e0915;
 }
 
 .win-btn-close {
   font-weight: bold;
+}
+.win-btn-close:hover:not(:disabled) {
+  background: #e62839;
+  border-color: #9c1320;
+  color: #ffffff;
+}
+.win-btn-close:active:not(:disabled) {
+  border-style: inset;
+  background: #870b16;
 }
 
 /* ---- Menu bar ---- */

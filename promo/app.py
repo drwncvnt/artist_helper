@@ -33,9 +33,11 @@ HTML_TEMPLATE = """
   <script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
   <script src="/shared/platform-ui.js" defer></script>
   <style>
-    body { padding: 0; }
-    .promo-wrap { max-width: 460px; margin: 24px auto; padding: 0 12px; }
+    body { padding: 0; display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; }
+    .promo-wrap { width: 480px; max-width: 100%; margin: 24px auto; padding: 0 12px; }
     .promo-wrap .field { margin-bottom: 12px; }
+    .file-chosen-text { font-weight: bold; margin-top: 4px; color: var(--accent); }
+    .cover-thumb-preview { width: 80px; height: 80px; object-fit: cover; border: 1px inset var(--face); margin: 6px auto 0; display: none; }
   </style>
 </head>
 <body>
@@ -54,12 +56,17 @@ HTML_TEMPLATE = """
     </div>
     <div style="padding: 12px;">
       <p class="hint" style="margin-bottom: 12px;">
-        Generate a release promo card (1080&times;1920) from a square cover.
+        Generate a release promo card (1080&times;1920) for Stories / TikTok / Reels from a square cover.
       </p>
       <form class="groupbox" action="generate" method="post" enctype="multipart/form-data">
         <div class="field">
-          <label class="field-label" for="cover">Track cover (square image)</label>
-          <input type="file" id="cover" name="cover" accept="image/*" required />
+          <div class="upload-zone" id="dropzone">
+            <input type="file" id="cover" name="cover" accept="image/*" style="display:none;" required />
+            <div class="upload-zone-text">Click to choose cover image or drag &amp; drop here</div>
+            <div class="upload-zone-hint">Square artwork (JPG, PNG, WebP)</div>
+            <img id="coverThumb" class="cover-thumb-preview" alt="Preview" />
+            <div class="file-chosen-text" id="fileName"></div>
+          </div>
         </div>
         <div class="field">
           <label class="field-label" for="artist_name">Artist name</label>
@@ -73,13 +80,51 @@ HTML_TEMPLATE = """
           <label class="field-label" for="status">Status line</label>
           <input type="text" id="status" name="status" value="OUT NOW!" required />
         </div>
-        <div class="dialog-actions">
-          <button type="submit" class="btn primary">Generate card</button>
+        <div class="dialog-actions" style="margin-top: 10px;">
+          <button type="submit" class="btn primary" id="submitBtn">Generate Promo Card</button>
         </div>
       </form>
     </div>
+    <div class="statusbar">
+      <span class="status-field">Promo Cards · Ready</span>
+      <span class="status-field status-field--auto">1080&times;1920</span>
+    </div>
   </div>
 </div>
+<script>
+(() => {
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('cover');
+  const fileName = document.getElementById('fileName');
+  const coverThumb = document.getElementById('coverThumb');
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+      fileInput.files = e.dataTransfer.files;
+      updateDisplay();
+    }
+  });
+
+  fileInput.addEventListener('change', updateDisplay);
+
+  function updateDisplay() {
+    if (fileInput.files && fileInput.files[0]) {
+      const f = fileInput.files[0];
+      fileName.textContent = 'Selected: ' + f.name;
+      coverThumb.src = URL.createObjectURL(f);
+      coverThumb.style.display = 'block';
+    } else {
+      fileName.textContent = '';
+      coverThumb.style.display = 'none';
+    }
+  }
+})();
+</script>
 </body>
 </html>
 """

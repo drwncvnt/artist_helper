@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audio Tag &amp; Metadata Editor - drwncvnt</title>
+  <link rel="stylesheet" href="/shared/xp.css?v=0.4.0" />
+  <script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
+  <script src="/shared/platform-ui.js?v=0.4.0" defer></script>
+  <style>
+    body { padding: 0; display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; }
+    .tag-wrap { width: 780px; max-width: 100%; margin: 16px auto; padding: 0 12px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+    @media (max-width: 680px) { .form-grid { grid-template-columns: 1fr; } }
+    .field-row { display: flex; gap: 8px; }
+    .field-row .field { flex: 1; }
+    .cover-box { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px; }
+    .cover-preview { width: 140px; height: 140px; object-fit: cover; border: 1px inset var(--face); background: #eee; margin-bottom: 8px; }
+    .cover-meta { font-size: 10px; color: #505050; text-align: center; margin-bottom: 6px; }
+    .cover-btns { display: flex; gap: 6px; }
+    .badge-info { background: var(--face-light); border: 1px inset var(--face); padding: 4px 8px; font-size: 11px; margin-top: 8px; display: none; }
+    .loading-overlay { display: none; text-align: center; padding: 12px 0; }
+  </style>
+</head>
+<body>
+<div class="tag-wrap">
+  <div class="window">
+    <div class="titlebar">
+      <div class="titlebar-icon"></div>
+      <span class="titlebar-text">Audio Tag &amp; Metadata Editor — Properties</span>
+      <div class="titlebar-buttons">
+        <a class="status-link" href="/">&#8592; Hub</a>
+      </div>
+    </div>
+    <div class="menubar">
+      <span role="button" tabindex="0" data-platform-help>Help</span>
+      <span role="button" tabindex="0" data-platform-aboba>aboba</span>
+    </div>
+
+    <div style="padding: 12px;">
+      <p class="hint" style="margin-bottom: 8px;">
+        Inspect and edit ID3, WAV, FLAC, and M4A metadata, ISRC codes, BPM, key, and album artwork.
+      </p>
+
+      <!-- Audio Dropzone -->
+      <div class="upload-zone" id="audioDropzone">
+        <input type="file" id="audioFileInput" accept="audio/*,.mp3,.wav,.flac,.m4a,.ogg,.opus,.aiff" style="display:none;" />
+        <div class="upload-zone-text" id="dropzoneText">Click to choose an audio file or drag &amp; drop here</div>
+        <div class="upload-zone-hint">Supports MP3, WAV, FLAC, M4A, OGG, AIFF</div>
+      </div>
+
+      <!-- File Summary Badge -->
+      <div class="badge-info" id="fileInfoBadge">
+        <span id="fileBadgeText"></span>
+      </div>
+
+      <!-- Loading / Progress -->
+      <div class="loading-overlay" id="loadingWrap">
+        <div class="xp-progress">
+          <div class="xp-progress-bar xp-progress-bar--animated xp-progress-bar--indeterminate"></div>
+        </div>
+        <p class="hint" id="loadingText" style="margin-top: 6px;">Reading audio tags…</p>
+      </div>
+
+      <!-- Editor Form -->
+      <form id="tagForm" style="display:none;" onsubmit="return false;">
+        <div class="form-grid">
+          <!-- Left Column: Standard Tag info -->
+          <div class="groupbox">
+            <div class="groupbox-title">Track Information</div>
+            <div class="field">
+              <label class="field-label" for="inpTitle">Title</label>
+              <input type="text" id="inpTitle" name="title" placeholder="Track title" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="inpArtist">Artist</label>
+              <input type="text" id="inpArtist" name="artist" placeholder="Artist name" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="inpAlbum">Album</label>
+              <input type="text" id="inpAlbum" name="album" placeholder="Album / EP title" />
+            </div>
+            <div class="field">
+              <label class="field-label" for="inpAlbumArtist">Album Artist</label>
+              <input type="text" id="inpAlbumArtist" name="album_artist" placeholder="e.g. Various Artists" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field-label" for="inpYear">Year / Date</label>
+                <input type="text" id="inpYear" name="year" placeholder="2026" maxlength="10" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="inpGenre">Genre</label>
+                <input type="text" id="inpGenre" name="genre" placeholder="e.g. Electronic, Hip Hop" />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="field-label" for="inpTrackNum">Track #</label>
+                <input type="text" id="inpTrackNum" name="track_num" placeholder="1" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="inpTrackTotal">Total Tracks</label>
+                <input type="text" id="inpTrackTotal" name="track_total" placeholder="12" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="inpDiscNum">Disc #</label>
+                <input type="text" id="inpDiscNum" name="disc_num" placeholder="1" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: DJ / Distribution & Cover Art -->
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <!-- DJ & Meta Details -->
+            <div class="groupbox">
+              <div class="groupbox-title">DJ &amp; Release Codes</div>
+              <div class="field-row">
+                <div class="field">
+                  <label class="field-label" for="inpBpm">BPM</label>
+                  <input type="text" id="inpBpm" name="bpm" placeholder="e.g. 140" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="inpKey">Key</label>
+                  <input type="text" id="inpKey" name="key" placeholder="e.g. 8A / Am" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="inpIsrc">ISRC</label>
+                  <input type="text" id="inpIsrc" name="isrc" placeholder="CC-XXX-YY-NNNNN" maxlength="15" />
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" for="inpCopyright">Copyright / Label</label>
+                <input type="text" id="inpCopyright" name="copyright" placeholder="&copy; 2026 Record Label" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="inpComment">Comment</label>
+                <input type="text" id="inpComment" name="comment" placeholder="Optional comments" />
+              </div>
+            </div>
+
+            <!-- Cover Art -->
+            <div class="groupbox">
+              <div class="groupbox-title">Album Artwork</div>
+              <div class="cover-box">
+                <img id="coverImg" class="cover-preview" alt="No Cover Artwork" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' fill='%23aaa'%3E%3Crect width='100' height='100' fill='%23eee'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='11' fill='%23888'%3ENo Cover%3C/text%3E%3C/svg%3E" />
+                <div class="cover-meta" id="coverMetaText">No embedded artwork</div>
+                <input type="file" id="coverFileInput" accept="image/jpeg,image/png,image/webp" style="display:none;" />
+                <div class="cover-btns">
+                  <button type="button" class="btn" id="btnChooseCover">Choose Image…</button>
+                  <button type="button" class="btn" id="btnRemoveCover">Remove</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="dialog-actions" style="margin-top: 14px; gap: 8px;">
+          <button type="button" class="btn primary" id="btnSave">Save &amp; Download</button>
+          <button type="button" class="btn" id="btnClear">Clear</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="statusbar">
+      <span class="status-field" id="sbStatus">Audio Tag Editor · Ready</span>
+      <span class="status-field status-field--auto" id="sbFormat">No file loaded</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  let currentAudioFile = null;
+  let newCoverFile = null;
+  let removeCoverFlag = false;
+
+  const audioDropzone = document.getElementById('audioDropzone');
+  const audioFileInput = document.getElementById('audioFileInput');
+  const dropzoneText = document.getElementById('dropzoneText');
+  const fileInfoBadge = document.getElementById('fileInfoBadge');
+  const fileBadgeText = document.getElementById('fileBadgeText');
+  const loadingWrap = document.getElementById('loadingWrap');
+  const loadingText = document.getElementById('loadingText');
+  const tagForm = document.getElementById('tagForm');
+  const sbStatus = document.getElementById('sbStatus');
+  const sbFormat = document.getElementById('sbFormat');
+
+  const coverImg = document.getElementById('coverImg');
+  const coverMetaText = document.getElementById('coverMetaText');
+  const coverFileInput = document.getElementById('coverFileInput');
+  const btnChooseCover = document.getElementById('btnChooseCover');
+  const btnRemoveCover = document.getElementById('btnRemoveCover');
+  const btnSave = document.getElementById('btnSave');
+  const btnClear = document.getElementById('btnClear');
+
+  const NO_COVER_SRC = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' fill='%23aaa'%3E%3Crect width='100' height='100' fill='%23eee'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='11' fill='%23888'%3ENo Cover%3C/text%3E%3C/svg%3E";
+
+  // Drag & drop for audio
+  audioDropzone.addEventListener('click', () => audioFileInput.click());
+  audioDropzone.addEventListener('dragover', (e) => { e.preventDefault(); audioDropzone.classList.add('dragover'); });
+  audioDropzone.addEventListener('dragleave', () => audioDropzone.classList.remove('dragover'));
+  audioDropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    audioDropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+      handleAudioFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  audioFileInput.addEventListener('change', () => {
+    if (audioFileInput.files && audioFileInput.files[0]) {
+      handleAudioFile(audioFileInput.files[0]);
+    }
+  });
+
+  // Cover image picking
+  btnChooseCover.addEventListener('click', () => coverFileInput.click());
+  coverFileInput.addEventListener('change', () => {
+    if (coverFileInput.files && coverFileInput.files[0]) {
+      const f = coverFileInput.files[0];
+      newCoverFile = f;
+      removeCoverFlag = false;
+      coverImg.src = URL.createObjectURL(f);
+      coverMetaText.textContent = `New: ${f.name} (${Math.round(f.size/1024)} KB)`;
+      if (window.platformToast) window.platformToast('New cover selected', 'info');
+    }
+  });
+
+  btnRemoveCover.addEventListener('click', () => {
+    newCoverFile = null;
+    removeCoverFlag = true;
+    coverImg.src = NO_COVER_SRC;
+    coverMetaText.textContent = 'Artwork will be removed';
+    if (window.platformToast) window.platformToast('Artwork marked for removal', 'info');
+  });
+
+  function handleAudioFile(file) {
+    currentAudioFile = file;
+    newCoverFile = null;
+    removeCoverFlag = false;
+    dropzoneText.textContent = `Loaded: ${file.name} (${(file.size / (1024*1024)).toFixed(2)} MB)`;
+    tagForm.style.display = 'none';
+    fileInfoBadge.style.display = 'none';
+    loadingWrap.style.display = 'block';
+    loadingText.textContent = 'Reading audio metadata…';
+    sbStatus.textContent = 'Reading metadata…';
+    sbFormat.textContent = file.name.split('.').pop().toUpperCase();
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    fetch('/api/read', { method: 'POST', body: fd })
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: 'Failed to read audio' }));
+          throw new Error(err.detail || 'Read failed');
+        }
+        return res.json();
+      })
+      .then((data) => {
+        loadingWrap.style.display = 'none';
+        tagForm.style.display = 'block';
+        fileInfoBadge.style.display = 'block';
+
+        const durMin = Math.floor(data.duration / 60);
+        const durSec = Math.floor(data.duration % 60).toString().padStart(2, '0');
+        const durStr = data.duration ? `${durMin}:${durSec}` : 'Unknown';
+        const brStr = data.bitrate ? `${data.bitrate} kbps` : '';
+        const srStr = data.sample_rate ? `${data.sample_rate} Hz` : '';
+        fileBadgeText.textContent = `Format: ${data.format} · Duration: ${durStr} · ${brStr} · ${srStr}`;
+
+        const t = data.tags || {};
+        document.getElementById('inpTitle').value = t.title || '';
+        document.getElementById('inpArtist').value = t.artist || '';
+        document.getElementById('inpAlbum').value = t.album || '';
+        document.getElementById('inpAlbumArtist').value = t.album_artist || '';
+        document.getElementById('inpYear').value = t.year || '';
+        document.getElementById('inpGenre').value = t.genre || '';
+        document.getElementById('inpTrackNum').value = t.track_num || '';
+        document.getElementById('inpTrackTotal').value = t.track_total || '';
+        document.getElementById('inpDiscNum').value = t.disc_num || '';
+        document.getElementById('inpBpm').value = t.bpm || '';
+        document.getElementById('inpKey').value = t.key || '';
+        document.getElementById('inpIsrc').value = t.isrc || '';
+        document.getElementById('inpCopyright').value = t.copyright || '';
+        document.getElementById('inpComment').value = t.comment || '';
+
+        if (data.cover && data.cover.data_uri) {
+          coverImg.src = data.cover.data_uri;
+          const dim = data.cover.width ? `${data.cover.width}×${data.cover.height} · ` : '';
+          const sz = `${Math.round(data.cover.size_bytes / 1024)} KB`;
+          coverMetaText.textContent = `Embedded: ${dim}${sz}`;
+        } else {
+          coverImg.src = NO_COVER_SRC;
+          coverMetaText.textContent = 'No embedded artwork';
+        }
+
+        sbStatus.textContent = 'Metadata loaded.';
+        if (window.platformToast) window.platformToast('Tags loaded successfully', 'info');
+      })
+      .catch((err) => {
+        loadingWrap.style.display = 'none';
+        sbStatus.textContent = 'Error reading file.';
+        alert('Could not read audio tags: ' + err.message);
+      });
+  }
+
+  // Save tags & download
+  btnSave.addEventListener('click', () => {
+    if (!currentAudioFile) return;
+
+    btnSave.disabled = true;
+    sbStatus.textContent = 'Writing metadata and packaging audio…';
+    loadingWrap.style.display = 'block';
+    loadingText.textContent = 'Saving tags and building file…';
+
+    const fd = new FormData();
+    fd.append('file', currentAudioFile);
+    if (newCoverFile) {
+      fd.append('cover_file', newCoverFile);
+    }
+    if (removeCoverFlag) {
+      fd.append('remove_cover', 'true');
+    }
+
+    fd.append('title', document.getElementById('inpTitle').value);
+    fd.append('artist', document.getElementById('inpArtist').value);
+    fd.append('album', document.getElementById('inpAlbum').value);
+    fd.append('album_artist', document.getElementById('inpAlbumArtist').value);
+    fd.append('year', document.getElementById('inpYear').value);
+    fd.append('genre', document.getElementById('inpGenre').value);
+    fd.append('track_num', document.getElementById('inpTrackNum').value);
+    fd.append('track_total', document.getElementById('inpTrackTotal').value);
+    fd.append('disc_num', document.getElementById('inpDiscNum').value);
+    fd.append('bpm', document.getElementById('inpBpm').value);
+    fd.append('key', document.getElementById('inpKey').value);
+    fd.append('isrc', document.getElementById('inpIsrc').value);
+    fd.append('copyright', document.getElementById('inpCopyright').value);
+    fd.append('comment', document.getElementById('inpComment').value);
+
+    fetch('/api/save', { method: 'POST', body: fd })
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: 'Save failed' }));
+          throw new Error(err.detail || 'Save failed');
+        }
+        return res.blob();
+      })
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = currentAudioFile.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        loadingWrap.style.display = 'none';
+        btnSave.disabled = false;
+        sbStatus.textContent = 'Saved & downloaded.';
+        if (window.platformToast) window.platformToast('Audio saved with updated tags!', 'info');
+      })
+      .catch((err) => {
+        loadingWrap.style.display = 'none';
+        btnSave.disabled = false;
+        sbStatus.textContent = 'Error saving tags.';
+        alert('Could not save metadata: ' + err.message);
+      });
+  });
+
+  btnClear.addEventListener('click', () => {
+    currentAudioFile = null;
+    newCoverFile = null;
+    removeCoverFlag = false;
+    tagForm.reset();
+    tagForm.style.display = 'none';
+    fileInfoBadge.style.display = 'none';
+    dropzoneText.textContent = 'Click to choose an audio file or drag & drop here';
+    sbStatus.textContent = 'Audio Tag Editor · Ready';
+    sbFormat.textContent = 'No file loaded';
+    coverImg.src = NO_COVER_SRC;
+    coverMetaText.textContent = 'No embedded artwork';
+  });
+})();
+</script>
+</body>
+</html>

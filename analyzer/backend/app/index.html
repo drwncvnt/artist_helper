@@ -10,18 +10,20 @@
 <script src="/shared/platform-ui.js" defer></script>
 <style>
   body { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; }
-  .aa { width: 440px; max-width: 100%; margin: 24px 12px; }
+  .aa { width: 460px; max-width: 100%; margin: 24px 12px; }
   .aa .body { padding: 12px; }
   .status {
     border: 1px inset var(--face); background: var(--field-bg);
-    padding: 8px; margin-top: 10px; font-size: 11px; min-height: 34px;
+    padding: 6px 8px; margin-top: 10px; font-size: 11px; min-height: 28px;
+    display: flex; align-items: center; justify-content: space-between;
   }
   .status.err { color: var(--danger); }
   .results { margin-top: 10px; }
   .results table { width: 100%; border-collapse: collapse; }
-  .results td { padding: 3px 6px; font-size: 11px; border-bottom: 1px solid var(--face-dark); }
-  .results td:first-child { color: #303030; width: 55%; }
+  .results td { padding: 4px 6px; font-size: 11px; border-bottom: 1px solid var(--face-dark); }
+  .results td:first-child { color: #303030; width: 50%; }
   .results td:last-child { font-weight: bold; text-align: right; }
+  .file-chosen-text { font-weight: bold; margin-top: 4px; color: var(--accent); }
 </style>
 </head>
 <body>
@@ -43,34 +45,50 @@
     <div class="body">
       <p class="hint" style="margin-bottom: 12px;">
         Get BPM and key, plus loudness and level metrics, for a single audio clip.
-        No reference track needed - just upload and analyze.
+        No reference track needed — just drop an audio file and analyze.
       </p>
 
       <form id="form" class="groupbox">
         <div class="field">
-          <label class="field-label" for="file">Audio clip</label>
-          <input type="file" id="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aac" required />
+          <div class="upload-zone" id="dropzone">
+            <input type="file" id="file" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aac" style="display:none;" required />
+            <div class="upload-zone-text">Click to choose an audio file or drag &amp; drop here</div>
+            <div class="upload-zone-hint">WAV, MP3, FLAC, OGG, M4A, AAC (max 40MB)</div>
+            <div class="file-chosen-text" id="fileName"></div>
+          </div>
         </div>
         <div class="dialog-actions" style="margin-top: 10px;">
-          <button type="submit" class="btn primary" id="submitBtn">Analyze</button>
+          <button type="submit" class="btn primary" id="submitBtn">Analyze Audio</button>
         </div>
       </form>
 
-      <div class="status hint" id="status">Ready.</div>
+      <div class="xp-progress hidden" id="progressWrap" style="margin-top: 10px;">
+        <div class="xp-progress-bar xp-progress-bar--animated xp-progress-bar--indeterminate"></div>
+      </div>
+
+      <div class="status hint" id="status">
+        <span id="statusText">Ready.</span>
+      </div>
 
       <div class="results groupbox hidden" id="results">
+        <div class="groupbox-title">Analysis Results</div>
         <table>
           <tr><td>Tempo</td><td id="rBpm"></td></tr>
-          <tr><td>Key</td><td id="rKey"></td></tr>
-          <tr><td>Integrated loudness</td><td id="rLufs"></td></tr>
-          <tr><td>Peak level</td><td id="rPeak"></td></tr>
-          <tr><td>RMS level</td><td id="rRms"></td></tr>
-          <tr><td>Crest factor</td><td id="rCrest"></td></tr>
-          <tr><td>Spectral centroid</td><td id="rCentroid"></td></tr>
-          <tr><td>Duration</td><td id="rDuration"></td></tr>
-          <tr><td>Sample rate</td><td id="rSampleRate"></td></tr>
+          <tr><td>Key Signature</td><td id="rKey"></td></tr>
+          <tr><td>Integrated Loudness</td><td id="rLufs"></td></tr>
+          <tr><td>Peak Level</td><td id="rPeak"></td></tr>
+          <tr><td>RMS Level</td><td id="rRms"></td></tr>
+          <tr><td>Crest Factor (Dynamic Range)</td><td id="rCrest"></td></tr>
+          <tr><td>Spectral Centroid (Brightness)</td><td id="rCentroid"></td></tr>
+          <tr><td>Clip Duration</td><td id="rDuration"></td></tr>
+          <tr><td>Sample Rate</td><td id="rSampleRate"></td></tr>
         </table>
       </div>
+    </div>
+
+    <div class="statusbar">
+      <span class="status-field" id="sbStatus">Audio Analyzer · Ready</span>
+      <span class="status-field status-field--auto">v0.3</span>
     </div>
   </div>
 </div>
@@ -79,13 +97,41 @@
 (() => {
   const form = document.getElementById('form');
   const fileEl = document.getElementById('file');
+  const dropzone = document.getElementById('dropzone');
+  const fileNameEl = document.getElementById('fileName');
   const submitBtn = document.getElementById('submitBtn');
+  const progressWrap = document.getElementById('progressWrap');
+  const statusText = document.getElementById('statusText');
   const statusEl = document.getElementById('status');
+  const sbStatus = document.getElementById('sbStatus');
   const resultsEl = document.getElementById('results');
 
+  dropzone.addEventListener('click', () => fileEl.click());
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+      fileEl.files = e.dataTransfer.files;
+      updateFileDisplay();
+    }
+  });
+
+  fileEl.addEventListener('change', updateFileDisplay);
+
+  function updateFileDisplay() {
+    if (fileEl.files && fileEl.files[0]) {
+      fileNameEl.textContent = 'Selected: ' + fileEl.files[0].name + ' (' + (fileEl.files[0].size / (1024 * 1024)).toFixed(2) + ' MB)';
+    } else {
+      fileNameEl.textContent = '';
+    }
+  }
+
   function setStatus(text, isError) {
-    statusEl.textContent = text;
+    statusText.textContent = text;
     statusEl.classList.toggle('err', !!isError);
+    sbStatus.textContent = isError ? 'Error: ' + text : 'Audio Analyzer · ' + text;
   }
 
   function fill(id, value) {
@@ -94,10 +140,14 @@
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!fileEl.files[0]) return;
+    if (!fileEl.files[0]) {
+      setStatus('Please select an audio file first.', true);
+      return;
+    }
     resultsEl.classList.add('hidden');
+    progressWrap.classList.remove('hidden');
     submitBtn.disabled = true;
-    setStatus('Analyzing... this can take a few seconds.');
+    setStatus('Analyzing audio metrics... please wait.');
 
     const fd = new FormData();
     fd.append('file', fileEl.files[0]);
@@ -121,10 +171,12 @@
       fill('rSampleRate', data.sample_rate + ' Hz');
 
       resultsEl.classList.remove('hidden');
-      setStatus('Done.');
+      setStatus('Analysis complete.');
+      if (window.platformToast) window.platformToast('Analysis completed successfully!', 'info');
     } catch {
       setStatus('Network error. Please try again.', true);
     } finally {
+      progressWrap.classList.add('hidden');
       submitBtn.disabled = false;
     }
   });

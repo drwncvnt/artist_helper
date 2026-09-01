@@ -145,6 +145,7 @@
           return;
         }
         close(feedbackDialog);
+        if (window.platformToast) window.platformToast('Thank you! Feedback submitted.', 'info');
       } catch (_) {
         errEl.textContent = 'Network error. Please try again.';
       } finally {
@@ -152,4 +153,36 @@
       }
     });
   });
+
+  // Reusable retro balloon / toast notification
+  let toastContainer = null;
+  window.platformToast = function (message, type, duration) {
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.className = 'xp-toast-container';
+      document.body.appendChild(toastContainer);
+    }
+    type = type || 'info';
+    duration = duration || 3500;
+    const toast = document.createElement('div');
+    toast.className = 'xp-toast xp-toast--' + type;
+    const icon = document.createElement('img');
+    icon.src = '/public/icons/status-info.png';
+    icon.style.width = '16px';
+    icon.style.height = '16px';
+    icon.style.flexShrink = '0';
+    icon.alt = '';
+    const text = document.createElement('span');
+    text.textContent = message;
+    toast.appendChild(icon);
+    toast.appendChild(text);
+    toastContainer.appendChild(toast);
+
+    setTimeout(function () {
+      toast.style.transition = 'opacity 0.2s, transform 0.2s';
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(8px)';
+      setTimeout(function () { toast.remove(); }, 200);
+    }, duration);
+  };
 })();

@@ -188,6 +188,10 @@
         <div class="meta-line hint" id="meta">Press Play to generate and preview.</div>
       </form>
     </div>
+    <div class="statusbar">
+      <span class="status-field" id="sbMidiStatus">MIDI Chaos · Ready</span>
+      <span class="status-field status-field--auto">Web Audio</span>
+    </div>
   </div>
 </div>
 
@@ -236,8 +240,10 @@
     $("seed").value = Math.floor(Math.random() * 2000000000) + 1;
   });
   $("copy").addEventListener("click", function () {
-    $("seed").select();
-    try { navigator.clipboard.writeText($("seed").value); } catch (e) {}
+    try {
+      navigator.clipboard.writeText($("seed").value);
+      if (window.platformToast) window.platformToast('Seed copied to clipboard!', 'info');
+    } catch (e) {}
   });
 
   // ---- build query string from the form ----------------------------------

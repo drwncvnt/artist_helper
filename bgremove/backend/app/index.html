@@ -10,18 +10,19 @@
 <script src="/shared/platform-ui.js" defer></script>
 <style>
   body { display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; }
-  .bgr { width: 560px; max-width: 100%; margin: 24px 12px; }
+  .bgr { width: 580px; max-width: 100%; margin: 24px 12px; }
   .bgr .body { padding: 12px; }
   .status {
     border: 1px inset var(--face); background: var(--field-bg);
-    padding: 8px; margin-top: 10px; font-size: 11px; min-height: 34px;
+    padding: 6px 8px; margin-top: 10px; font-size: 11px; min-height: 28px;
+    display: flex; align-items: center; justify-content: space-between;
   }
   .status.err { color: var(--danger); }
   .previews { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
   .preview-box {
     border: 1px inset var(--face); background: var(--field-bg);
     display: flex; align-items: center; justify-content: center;
-    min-height: 160px; overflow: hidden;
+    min-height: 180px; overflow: hidden; padding: 4px;
   }
   .preview-box.checker {
     background-image:
@@ -31,9 +32,9 @@
     background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
     background-color: #efefef;
   }
-  .preview-box img { max-width: 100%; max-height: 260px; display: block; }
-  .preview-label { font-size: 10px; color: #505050; text-align: center; margin-top: 3px; }
-  .hidden { display: none !important; }
+  .preview-box img { max-width: 100%; max-height: 260px; display: block; object-fit: contain; }
+  .preview-label { font-size: 10px; color: #505050; text-align: center; margin-top: 3px; font-weight: bold; }
+  .file-chosen-text { font-weight: bold; margin-top: 4px; color: var(--accent); }
 </style>
 </head>
 <body>
@@ -55,21 +56,31 @@
     <div class="body">
       <p class="hint" style="margin-bottom: 12px;">
         Upload a photo and get back a PNG with the background cut out.
-        JPG, PNG or WebP - the result always has a transparent background.
+        JPG, PNG or WebP — the result always renders with a clean transparent background.
       </p>
 
       <form id="form" class="groupbox">
         <div class="field">
-          <label class="field-label" for="file">Photo</label>
-          <input type="file" id="file" accept="image/jpeg,image/png,image/webp" required />
+          <div class="upload-zone" id="dropzone">
+            <input type="file" id="file" accept="image/jpeg,image/png,image/webp" style="display:none;" required />
+            <div class="upload-zone-text">Click to choose a photo or drag &amp; drop here</div>
+            <div class="upload-zone-hint">JPG, PNG, WebP (max 15MB)</div>
+            <div class="file-chosen-text" id="fileName"></div>
+          </div>
         </div>
         <div class="dialog-actions" style="margin-top: 10px;">
-          <button type="submit" class="btn primary" id="submitBtn">Remove background</button>
-          <a href="#" id="downloadBtn" class="btn hidden" download="cutout.png">Download PNG</a>
+          <button type="submit" class="btn primary" id="submitBtn">Remove Background</button>
+          <a href="#" id="downloadBtn" class="btn hidden" download="cutout.png" style="text-decoration:none; padding: 4px 10px;">Save Cutout PNG</a>
         </div>
       </form>
 
-      <div class="status hint" id="status">Ready.</div>
+      <div class="xp-progress hidden" id="progressWrap" style="margin-top: 10px;">
+        <div class="xp-progress-bar xp-progress-bar--animated xp-progress-bar--indeterminate"></div>
+      </div>
+
+      <div class="status hint" id="status">
+        <span id="statusText">Ready.</span>
+      </div>
 
       <div class="previews hidden" id="previews">
         <div>
@@ -78,9 +89,14 @@
         </div>
         <div>
           <div class="preview-box checker"><img id="afterImg" alt="Result" /></div>
-          <div class="preview-label">Background removed</div>
+          <div class="preview-label">Transparent Cutout</div>
         </div>
       </div>
+    </div>
+
+    <div class="statusbar">
+      <span class="status-field" id="sbStatus">Background Remover · Ready</span>
+      <span class="status-field status-field--auto">v0.3</span>
     </div>
   </div>
 </div>
@@ -89,24 +105,60 @@
 (() => {
   const form = document.getElementById('form');
   const fileEl = document.getElementById('file');
+  const dropzone = document.getElementById('dropzone');
+  const fileNameEl = document.getElementById('fileName');
   const submitBtn = document.getElementById('submitBtn');
   const downloadBtn = document.getElementById('downloadBtn');
+  const progressWrap = document.getElementById('progressWrap');
   const statusEl = document.getElementById('status');
+  const statusText = document.getElementById('statusText');
+  const sbStatus = document.getElementById('sbStatus');
   const previewsEl = document.getElementById('previews');
   const beforeImg = document.getElementById('beforeImg');
   const afterImg = document.getElementById('afterImg');
 
   let resultUrl = null;
+  let beforeUrl = null;
+
+  dropzone.addEventListener('click', () => fileEl.click());
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+      fileEl.files = e.dataTransfer.files;
+      updateFileDisplay();
+    }
+  });
+
+  fileEl.addEventListener('change', updateFileDisplay);
+
+  function updateFileDisplay() {
+    if (fileEl.files && fileEl.files[0]) {
+      const f = fileEl.files[0];
+      fileNameEl.textContent = 'Selected: ' + f.name + ' (' + (f.size / (1024 * 1024)).toFixed(2) + ' MB)';
+      if (beforeUrl) URL.revokeObjectURL(beforeUrl);
+      beforeUrl = URL.createObjectURL(f);
+      beforeImg.src = beforeUrl;
+    } else {
+      fileNameEl.textContent = '';
+    }
+  }
 
   function setStatus(text, isError) {
-    statusEl.textContent = text;
+    statusText.textContent = text;
     statusEl.classList.toggle('err', !!isError);
+    sbStatus.textContent = isError ? 'Error: ' + text : 'Background Remover · ' + text;
   }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const file = fileEl.files[0];
-    if (!file) return;
+    if (!file) {
+      setStatus('Please select an image file first.', true);
+      return;
+    }
 
     if (resultUrl) {
       URL.revokeObjectURL(resultUrl);
@@ -114,11 +166,9 @@
     }
     previewsEl.classList.add('hidden');
     downloadBtn.classList.add('hidden');
+    progressWrap.classList.remove('hidden');
     submitBtn.disabled = true;
-    setStatus('Removing background... this can take a few seconds, longer if others are ahead of you in line.');
-
-    const beforeUrl = URL.createObjectURL(file);
-    beforeImg.src = beforeUrl;
+    setStatus('Processing image segmentation... please wait.');
 
     const fd = new FormData();
     fd.append('file', file);
@@ -141,10 +191,12 @@
       downloadBtn.href = resultUrl;
       previewsEl.classList.remove('hidden');
       downloadBtn.classList.remove('hidden');
-      setStatus('Done.');
+      setStatus('Cutout complete.');
+      if (window.platformToast) window.platformToast('Background removed successfully!', 'info');
     } catch {
       setStatus('Network error. Please try again.', true);
     } finally {
+      progressWrap.classList.add('hidden');
       submitBtn.disabled = false;
     }
   });

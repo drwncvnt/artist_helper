@@ -10,7 +10,11 @@
 
 .boot-screen {
   height: 100vh;
-  background: var(--desktop, #245edb);
+  background-color: var(--desktop, #6b121d);
+  background-image: var(--wallpaper, url('/public/img.jfif'));
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
 }
 
 /* ---- Window layout ---- */
@@ -36,7 +40,7 @@
 }
 .hub-link {
   color: #fff;
-  border-color: #6a8ec8;
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
 /* ---- Upload panel ---- */
@@ -55,7 +59,7 @@
 }
 .dropzone.has-file {
   border-style: solid;
-  border-color: var(--accent, #000080);
+  border-color: var(--accent, #8b0e1d);
   color: #000;
 }
 
@@ -68,7 +72,7 @@
 }
 .progress-bar {
   height: 100%;
-  background: repeating-linear-gradient(90deg, #0a246a, #0a246a 8px, #1b3f9c 8px, #1b3f9c 16px);
+  background: repeating-linear-gradient(90deg, #7a0e1c, #7a0e1c 8px, #c42b3c 8px, #c42b3c 16px);
   transition: width 0.15s;
 }
 

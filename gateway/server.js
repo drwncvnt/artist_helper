@@ -28,6 +28,7 @@ const TOOLS = [
   { slug: 'midi', name: 'MIDI Chaos', desc: 'Generative MIDI sequencer - scales, engines & live preview', icon: '/public/icons/tool-midi-chaos.png', target: process.env.MIDI_URL },
   { slug: 'transcribe', name: 'Audio to MIDI (beta)', desc: 'Transcribe an audio clip into a MIDI file', icon: '/public/icons/tool-audio-to-midi.png', target: process.env.TRANSCRIBE_URL },
   { slug: 'analyzer', name: 'Audio Analyzer (beta)', desc: 'Get BPM and key, plus loudness & level metrics', icon: '/public/icons/tool-audio-analyzer.png', target: process.env.ANALYZER_URL },
+  { slug: 'tags', name: 'Audio Tag Editor', desc: 'ID3/WAV metadata, ISRC & album cover art', icon: '/public/icons/tool-tags.png', target: process.env.TAGS_URL },
   { slug: 'bgremove', name: 'Background Remover', desc: 'Cut a photo’s background out to transparent PNG', icon: '/public/icons/tool-bg-remove.png', target: process.env.BGREMOVE_URL },
 ];
 const enabledTools = TOOLS.filter((t) => !!t.target);
@@ -36,6 +37,26 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(cookieParser());
+
+// Rate limiting: protect against volumetric floods, scrapers, and brute-force storms
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' },
+  skip: (req) => req.path.startsWith('/shared') || req.path.startsWith('/public'),
+});
+app.use(globalLimiter);
+
+const authGatewayLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again later.' },
+});
+app.use('/api/auth', authGatewayLimiter);
 
 function readSession(req) {
   const token = req.cookies[COOKIE_NAME];
@@ -60,12 +81,17 @@ function readSession(req) {
 // once already. express.static still sends ETag/Last-Modified, so an
 // unchanged file is still served as a cheap 304 - we just stop trusting the
 // clock over the actual file content.
+express.static.mime.define({ 'image/jpeg': ['jfif'] });
 app.use('/shared', express.static(SHARED_DIR));
 
 // Public static assets (e.g. the aboba gif, tool icons) served to every tool.
 // Public so the login page and all tools can reference them without a
 // session. Same caching reasoning as /shared above.
-app.use('/public', express.static(PUBASSETS_DIR));
+app.use('/public', express.static(PUBASSETS_DIR, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.jfif')) res.setHeader('Content-Type', 'image/jpeg');
+  }
+}));
 
 // Auth API is proxied to the accounts service. pathFilter keeps the original
 // path (/api/auth/login etc.) intact when forwarding.
