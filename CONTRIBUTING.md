@@ -28,8 +28,27 @@ Each part is independent:
    when proxied under `/<slug>/`.
 2. Add the service to `docker-compose.yml`.
 3. Register it in the gateway's `TOOLS` list and set its `*_URL` env var.
-4. If the tool needs to know who the user is, read the `X-Auth-User-Id` /
-   `X-Auth-Username` headers the gateway injects - do **not** add a separate login.
+4. If the tool needs to know who the user is, mark it `identity: true` in `TOOLS`
+   and read the `X-Auth-User-Id` / `X-Auth-Username` headers the gateway injects,
+   accepting them only when `X-Gateway-Secret` matches the `GATEWAY_SECRET` env var
+   (compare with `hmac.compare_digest`). Do **not** add a separate login. If it
+   stores per-user data, give it a `purgePath` endpoint so account deletion can
+   remove that data.
+5. Never build a file path from a client-supplied file name; generate the name on
+   the server and only reuse the client's extension after checking it against an
+   allowlist.
+
+## Tests
+
+```bash
+cd gateway && npm ci && npm test
+docker run --rm -v "$PWD/beats:/src" -w /src python:3.12-slim \
+  sh -c "pip install -q -r backend/requirements.txt pytest httpx && python -m pytest tests"
+docker run --rm -v "$PWD/tags:/src" -w /src python:3.11-slim \
+  sh -c "pip install -q -r backend/requirements.txt pytest httpx && python -m pytest tests"
+```
+
+The same tests, plus dependency audits, run in GitHub Actions on every push.
 
 ## Guidelines
 

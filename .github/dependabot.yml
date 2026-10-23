@@ -1,0 +1,35 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories: ["/gateway", "/accounts", "/beats/frontend"]
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directories:
+      - "/analyzer/backend"
+      - "/beats/backend"
+      - "/bgremove/backend"
+      - "/midi"
+      - "/promo"
+      - "/tags/backend"
+      - "/transcribe/backend"
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directories:
+      - "/accounts"
+      - "/analyzer"
+      - "/beats"
+      - "/bgremove"
+      - "/gateway"
+      - "/midi"
+      - "/photo"
+      - "/promo"
+      - "/tags"
+      - "/transcribe"
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

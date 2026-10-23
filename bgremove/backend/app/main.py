@@ -10,8 +10,10 @@ under - see MAX_CONCURRENT_JOBS below for why that matters.
 """
 
 import asyncio
+import hmac
 import io
 import os
+from contextlib import asynccontextmanager
 from functools import lru_cache
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile, status
@@ -40,19 +42,33 @@ MAX_QUEUE_WAITING = max(0, int(os.environ.get("MAX_QUEUE_WAITING", "20")))
 # forever and freeze the queue for every waiting user, not just itself.
 PROCESSING_TIMEOUT_SECONDS = 60
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
+# The decoders allowed to parse an upload. The declared content type above is
+# just a client claim; this is what actually limits Pillow's attack surface.
+IMAGE_FORMATS = ["JPEG", "PNG", "WEBP"]
+GATEWAY_SECRET = os.environ.get("GATEWAY_SECRET", "")
+# Images one user may have queued or processing at once, so a single account
+# can't take every place in the line.
+MAX_ACTIVE_PER_USER = 2
 
-app = FastAPI(title="bgremove API")
 inference_slots = asyncio.Semaphore(MAX_CONCURRENT_JOBS)
 # Plain module-level counter, not a queue.Queue: only ever touched between
 # awaits in this single-worker event loop, so no lock is needed, and
 # asyncio.Semaphore already wakes waiters in FIFO order on its own.
 _waiting_count = 0
+_active_per_user: dict[str, int] = {}
 
 
-def current_user_id(x_auth_user_id: str | None = Header(default=None)) -> str:
-    """Identity injected by the gateway. This service is only reachable through
-    the gateway, which strips any client-supplied copy of this header."""
-    if not x_auth_user_id:
+def current_user_id(
+    x_auth_user_id: str | None = Header(default=None),
+    x_gateway_secret: str | None = Header(default=None),
+) -> str:
+    """Identity injected by the gateway. The shared secret proves the request
+    came through the gateway (which strips client-supplied copies of these
+    headers) rather than from another container on the network."""
+    from_gateway = bool(GATEWAY_SECRET) and bool(x_gateway_secret) and hmac.compare_digest(
+        x_gateway_secret.encode(), GATEWAY_SECRET.encode()
+    )
+    if not from_gateway or not x_auth_user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return x_auth_user_id
 
@@ -69,7 +85,7 @@ def normalize_image(raw: bytes) -> bytes:
     PNG. Runs before the model so a corrupt/oversized upload is rejected
     without ever touching the (much more expensive) inference path."""
     try:
-        with Image.open(io.BytesIO(raw)) as source:
+        with Image.open(io.BytesIO(raw), formats=IMAGE_FORMATS) as source:
             if source.width * source.height > MAX_IMAGE_PIXELS:
                 raise HTTPException(
                     status_code=413,
@@ -109,9 +125,13 @@ def _warm_up() -> None:
     remove_background(buf.getvalue())
 
 
-@app.on_event("startup")
-async def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     await run_in_threadpool(_warm_up)
+    yield
+
+
+app = FastAPI(title="bgremove API", lifespan=lifespan)
 
 
 @app.get("/api/health")
@@ -148,8 +168,21 @@ async def remove_endpoint(
     # semaphore so a queue that's already deep fails new arrivals immediately
     # instead of growing forever.
     global _waiting_count
+    if _active_per_user.get(user_id, 0) >= MAX_ACTIVE_PER_USER:
+        raise HTTPException(status_code=429, detail="Please wait for your current images to finish.")
     if _waiting_count >= MAX_QUEUE_WAITING:
         raise HTTPException(status_code=503, detail="The queue is full right now. Please try again shortly.")
+    _active_per_user[user_id] = _active_per_user.get(user_id, 0) + 1
+    try:
+        return await _process_queued(raw)
+    finally:
+        _active_per_user[user_id] -= 1
+        if not _active_per_user[user_id]:
+            del _active_per_user[user_id]
+
+
+async def _process_queued(raw: bytes) -> Response:
+    global _waiting_count
     _waiting_count += 1
     try:
         await inference_slots.acquire()

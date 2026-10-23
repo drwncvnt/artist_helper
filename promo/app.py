@@ -11,14 +11,22 @@ it works when served under the gateway at /promo/.
 
 import io
 import os
+import re
 
 from flask import Flask, request, render_template_string, send_file
-from PIL import Image, ImageFilter, ImageEnhance, ImageDraw, ImageFont
+from PIL import Image, ImageFilter, ImageEnhance, ImageDraw, ImageFont, UnidentifiedImageError
 
 app = Flask(__name__)
 
 # Cap uploaded covers at a sane size (these are just square artwork images).
 app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024  # 25 MB
+# A small compressed file can still decode to a huge bitmap; refuse anything
+# that wouldn't fit comfortably in this container's memory.
+MAX_PIXELS = 25_000_000
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS
+# Only these decoders ever see an upload; Pillow's many rarer format plugins
+# are where most of its parser bugs live.
+COVER_FORMATS = ["JPEG", "PNG", "WEBP"]
 
 FONT_PATH = os.path.join(os.path.dirname(__file__), "font.ttf")
 
@@ -74,11 +82,11 @@ HTML_TEMPLATE = """
         </div>
         <div class="field">
           <label class="field-label" for="track_name">Track name</label>
-          <input type="text" id="track_name" name="track_name" placeholder="e.g. healing process" required />
+          <input type="text" id="track_name" name="track_name" placeholder="e.g. healing process" maxlength="80" required />
         </div>
         <div class="field">
           <label class="field-label" for="status">Status line</label>
-          <input type="text" id="status" name="status" value="OUT NOW!" required />
+          <input type="text" id="status" name="status" value="OUT NOW!" maxlength="40" required />
         </div>
         <div class="dialog-actions" style="margin-top: 10px;">
           <button type="submit" class="btn primary" id="submitBtn">Generate Promo Card</button>
@@ -141,11 +149,17 @@ def generate():
         return "No cover uploaded", 400
 
     cover_file = request.files["cover"]
-    artist_name = request.form.get("artist_name", "").strip() or "UNKNOWN ARTIST"
-    track_name = request.form.get("track_name", "UNKNOWN TRACK").upper()
-    status_text = request.form.get("status", "OUT NOW!").upper()
+    artist_name = request.form.get("artist_name", "").strip()[:60] or "UNKNOWN ARTIST"
+    track_name = (request.form.get("track_name", "").strip() or "UNKNOWN TRACK")[:80].upper()
+    status_text = (request.form.get("status", "").strip() or "OUT NOW!")[:40].upper()
 
-    original = Image.open(cover_file).convert("RGB")
+    try:
+        with Image.open(cover_file, formats=COVER_FORMATS) as source:
+            if source.width * source.height > MAX_PIXELS:
+                return "That image is too large. Please use one under 25 megapixels.", 400
+            original = source.convert("RGB")
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError):
+        return "That file is not a supported image. Please use a JPG, PNG or WebP.", 400
 
     W, H = 1080, 1920
 
@@ -181,7 +195,7 @@ def generate():
         img_io,
         mimetype="image/jpeg",
         as_attachment=True,
-        download_name=f"promo_{track_name.replace(' ', '_')}.jpg",
+        download_name=f"promo_{re.sub(r'[^A-Za-z0-9_-]+', '_', track_name).strip('_') or 'card'}.jpg",
     )
 
 

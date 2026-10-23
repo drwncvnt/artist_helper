@@ -7,6 +7,12 @@
 <link rel="stylesheet" href="/shared/xp.css?v=0.4.1" />
 <script defer src="https://stats.drwncvnt.com/script.js" data-website-id="e842424d-b5e8-4642-960e-46be6f5c2aa1"></script>
 <script src="/shared/platform-ui.js?v=0.4.1" defer></script>
+<style>
+  .account-dialog { width: 360px; }
+  .account-dialog .groupbox + .groupbox { margin-top: 10px; }
+  .account-dialog input[type="password"] { width: 100%; box-sizing: border-box; }
+  .account-dialog .confirm-line { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+</style>
 </head>
 <body>
 <div class="window window--full">
@@ -27,6 +33,9 @@
         <a class="menu-item" role="menuitem" href="/">
           <img class="menu-item-icon" src="/public/icons/nav-home.png" alt="" />Home
         </a>
+        <button type="button" class="menu-item" role="menuitem" data-action="account">
+          <img class="menu-item-icon" src="/public/icons/menu-account.png" alt="" />Account settings...
+        </button>
         <div class="menu-separator" role="separator"></div>
         <button type="button" class="menu-item" role="menuitem" data-action="sign-out">
           <img class="menu-item-icon" src="/public/icons/action-logout.png" alt="" />Sign out
@@ -85,6 +94,54 @@
     <a class="status-link" href="https://github.com/drwncvnt/artist_helper" target="_blank" rel="noopener">
       open source - github.com/drwncvnt/artist_helper
     </a>
+  </div>
+</div>
+
+<div class="dialog-overlay hidden" id="accountDialog">
+  <div class="dialog window account-dialog" role="dialog" aria-labelledby="accountDialogTitle">
+    <div class="titlebar">
+      <div class="titlebar-icon"></div>
+      <span class="titlebar-text" id="accountDialogTitle">Account settings</span>
+      <div class="titlebar-buttons">
+        <button class="win-btn win-btn-close" data-close tabindex="-1">X</button>
+      </div>
+    </div>
+    <div class="dialog-body">
+      <form class="groupbox" id="passwordForm">
+        <div class="groupbox-title">Change password</div>
+        <p class="dialog-error" id="passwordError"></p>
+        <div class="field">
+          <label class="field-label" for="pwCurrent">Current password</label>
+          <input type="password" id="pwCurrent" autocomplete="current-password" maxlength="256" required />
+        </div>
+        <div class="field">
+          <label class="field-label" for="pwNew">New password</label>
+          <input type="password" id="pwNew" autocomplete="new-password" minlength="8" maxlength="256" required />
+        </div>
+        <div class="field">
+          <label class="field-label" for="pwConfirm">Confirm new password</label>
+          <input type="password" id="pwConfirm" autocomplete="new-password" minlength="8" maxlength="256" required />
+        </div>
+        <p class="hint">Changing your password signs you out on every other device.</p>
+        <div class="dialog-actions">
+          <button type="submit" class="btn primary" id="pwSubmit">Change password</button>
+        </div>
+      </form>
+
+      <form class="groupbox" id="deleteForm">
+        <div class="groupbox-title">Delete account</div>
+        <p class="hint">Permanently deletes your account and every track you uploaded to Beat Share. This cannot be undone.</p>
+        <p class="dialog-error" id="deleteError"></p>
+        <div class="field">
+          <label class="field-label" for="delPassword">Password</label>
+          <input type="password" id="delPassword" autocomplete="current-password" maxlength="256" required />
+        </div>
+        <label class="confirm-line"><input type="checkbox" id="delConfirm" required /> I understand this cannot be undone</label>
+        <div class="dialog-actions">
+          <button type="submit" class="btn" id="delSubmit">Delete my account</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -285,6 +342,76 @@
     const action = actionEl.dataset.action;
     if (action === 'sign-out') logout();
     else if (action === 'refresh') window.location.reload();
+    else if (action === 'account') openAccountDialog();
+  });
+
+  // ---- Account settings dialog -------------------------------------------
+  const accountDialog = document.getElementById('accountDialog');
+  const passwordForm = document.getElementById('passwordForm');
+  const deleteForm = document.getElementById('deleteForm');
+  const passwordError = document.getElementById('passwordError');
+  const deleteError = document.getElementById('deleteError');
+
+  function openAccountDialog() {
+    closeAllMenus();
+    passwordForm.reset();
+    deleteForm.reset();
+    passwordError.textContent = '';
+    deleteError.textContent = '';
+    accountDialog.classList.remove('hidden');
+    document.getElementById('pwCurrent').focus();
+  }
+  function closeAccountDialog() {
+    accountDialog.classList.add('hidden');
+  }
+  accountDialog.addEventListener('click', (e) => { if (e.target === accountDialog) closeAccountDialog(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAccountDialog(); });
+
+  async function postJson(url, body) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+    return data;
+  }
+
+  passwordForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    passwordError.textContent = '';
+    const current = document.getElementById('pwCurrent').value;
+    const next = document.getElementById('pwNew').value;
+    if (next !== document.getElementById('pwConfirm').value) {
+      passwordError.textContent = 'The new passwords do not match.';
+      return;
+    }
+    const button = document.getElementById('pwSubmit');
+    button.disabled = true;
+    try {
+      await postJson('/api/auth/password', { current_password: current, new_password: next });
+      closeAccountDialog();
+      if (window.platformToast) window.platformToast('Password changed. Other devices were signed out.', 'info');
+    } catch (err) {
+      passwordError.textContent = err.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  deleteForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    deleteError.textContent = '';
+    const button = document.getElementById('delSubmit');
+    button.disabled = true;
+    try {
+      await postJson('/api/account/delete', { password: document.getElementById('delPassword').value });
+      window.location.href = '/login';
+    } catch (err) {
+      deleteError.textContent = err.message;
+      button.disabled = false;
+    }
   });
 })();
 </script>

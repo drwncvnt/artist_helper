@@ -26,6 +26,11 @@ _MAJOR_PROFILE = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39,
 _MINOR_PROFILE = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
 _NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
+# Memory use grows with the number of samples (HPSS keeps several full-size
+# spectrograms around), so high-resolution files are resampled to this rate on
+# load. 44.1/48 kHz material, i.e. almost everything, is analyzed untouched.
+MAX_SAMPLE_RATE = 48000
+
 
 def _detect_key(y: np.ndarray, sr: int) -> tuple[str, float]:
     """Returns (key name e.g. "C major", correlation confidence 0-1)."""
@@ -41,14 +46,18 @@ def _detect_key(y: np.ndarray, sr: int) -> tuple[str, float]:
     return best_name, max(0.0, min(1.0, float(best_corr)))
 
 
-def analyze(path: str) -> dict:
+def analyze(path: str, native_sr: int | None = None) -> dict:
     """Analyze an audio file and return its musical/level metrics.
 
     Loaded as mono for the DSP: tempo, key, and level metrics are all
     well-defined on a mono mixdown, and it keeps analysis time and memory
     small and predictable regardless of the source channel count.
+
+    `native_sr` is the file's sample rate as reported by ffprobe. Files above
+    MAX_SAMPLE_RATE (or of unknown rate) are resampled down to it.
     """
-    y, sr = librosa.load(path, sr=None, mono=True)
+    target_sr = None if native_sr and native_sr <= MAX_SAMPLE_RATE else MAX_SAMPLE_RATE
+    y, sr = librosa.load(path, sr=target_sr, mono=True)
     if y.size == 0:
         raise ValueError("Audio file has no samples.")
 
@@ -107,6 +116,6 @@ def warm_up() -> None:
     os.close(fd)
     try:
         sf.write(path, tone, sr)
-        analyze(path)
+        analyze(path, sr)
     finally:
         os.unlink(path)

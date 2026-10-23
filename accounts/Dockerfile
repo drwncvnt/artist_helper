@@ -1,11 +1,15 @@
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
+ENV NODE_ENV=production
 
-COPY package.json package-lock.json* ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
+# App files stay owned by root, so the unprivileged runtime user can read but
+# never modify the code it runs.
 COPY . .
+USER node
 
 EXPOSE 4100
 CMD ["node", "server.js"]

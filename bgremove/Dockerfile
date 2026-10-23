@@ -1,8 +1,11 @@
 FROM python:3.12-slim
 
+# NUMBA_CACHE_DIR: pymatting JIT-compiles with numba, and the container
+# filesystem is read-only at runtime, so its cache lives on the /tmp tmpfs.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    U2NET_HOME=/models
+    U2NET_HOME=/models \
+    NUMBA_CACHE_DIR=/tmp/numba-cache
 
 WORKDIR /app
 
@@ -17,7 +20,7 @@ COPY backend/app ./app
 
 RUN useradd --create-home --uid 1000 appuser \
     && mkdir -p /models \
-    && chown -R appuser:appuser /app /models
+    && chown -R appuser:appuser /models
 USER appuser
 
 EXPOSE 8000

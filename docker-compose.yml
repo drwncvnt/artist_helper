@@ -1,8 +1,23 @@
 # drwncvnt platform - one login, many tools.
 #
 # Only the gateway is published to the host. Everything else (accounts, the
-# database, and each tool) talks over the internal Docker network and is never
+# database, and each tool) talks over internal Docker networks and is never
 # reachable from outside, so the gateway's session gate is the single front door.
+#
+# Networks:
+#   default  gateway + tools. Tools can't see accounts or the database.
+#   auth     gateway + accounts only (no internet access).
+#   data     accounts + database only (no internet access).
+
+# Baseline hardening for every app container: no privilege escalation, no
+# Linux capabilities, and a read-only root filesystem (writes only go to the
+# volumes and tmpfs mounts declared per service).
+x-hardened: &hardened
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
 
 services:
   db:
@@ -14,6 +29,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - db-data:/var/lib/postgresql/data
+    networks:
+      - data
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U drwncvnt"]
       interval: 5s
@@ -26,14 +45,21 @@ services:
     restart: unless-stopped
 
   accounts:
+    <<: *hardened
     build: ./accounts
     container_name: dp_accounts
     environment:
       DATABASE_URL: postgres://drwncvnt:${POSTGRES_PASSWORD}@db:5432/drwncvnt
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      GATEWAY_SECRET: ${GATEWAY_SECRET:?set GATEWAY_SECRET in .env}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-dp_session}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-2592000}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    tmpfs:
+      - /tmp:size=16m
+    networks:
+      - auth
+      - data
     depends_on:
       db:
         condition: service_healthy
@@ -47,11 +73,35 @@ services:
   photo:
     build: ./photo
     container_name: dp_photo
+    # nginx's master process starts as root, binds port 80, then drops to the
+    # nginx user for its workers; these are the only capabilities it needs.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=16m
+      - /var/run:size=1m
+      - /tmp:size=16m
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128m
     restart: unless-stopped
 
   promo:
+    <<: *hardened
     build: ./promo
     container_name: dp_promo
+    tmpfs:
+      - /tmp:size=128m
     deploy:
       resources:
         limits:
@@ -60,8 +110,11 @@ services:
     restart: unless-stopped
 
   midi:
+    <<: *hardened
     build: ./midi
     container_name: dp_midi
+    tmpfs:
+      - /tmp:size=16m
     deploy:
       resources:
         limits:
@@ -70,29 +123,45 @@ services:
     restart: unless-stopped
 
   beats:
+    <<: *hardened
     build: ./beats
     container_name: dp_beats
     environment:
       SIGNING_SECRET: ${SIGNING_SECRET:?set SIGNING_SECRET in .env}
+      GATEWAY_SECRET: ${GATEWAY_SECRET:?set GATEWAY_SECRET in .env}
       STORAGE_DIR: /data/storage
       DB_DIR: /data/db
       MAX_UPLOAD_MB: ${BEATS_MAX_UPLOAD_MB:-200}
+      USER_QUOTA_MB: ${BEATS_USER_QUOTA_MB:-1024}
+      MIN_FREE_DISK_MB: ${BEATS_MIN_FREE_DISK_MB:-10240}
     volumes:
       - beats-storage:/data/storage
       - beats-db:/data/db
+      # Uploads are spooled to /tmp while they arrive; a disk-backed volume
+      # keeps a 200 MB upload out of the container's memory.
+      - beats-tmp:/tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 768m
     restart: unless-stopped
 
   # Audio -> MIDI transcription. Caps concurrent analyses at 2 (in-process queue),
   # so this runs as a single web process; extra requests wait in line.
   transcribe:
+    <<: *hardened
     build: ./transcribe
     container_name: dp_transcribe
     environment:
+      GATEWAY_SECRET: ${GATEWAY_SECRET:?set GATEWAY_SECRET in .env}
       WORK_DIR: /data/work
       MAX_UPLOAD_MB: ${TRANSCRIBE_MAX_UPLOAD_MB:-25}
       MAX_DURATION_SECONDS: ${TRANSCRIBE_MAX_DURATION_SECONDS:-60}
     volumes:
       - transcribe-work:/data/work
+    tmpfs:
+      - /tmp:size=256m
     deploy:
       resources:
         limits:
@@ -101,21 +170,27 @@ services:
     restart: unless-stopped
 
   # Single-clip audio analysis: BPM, key, loudness/level metrics. No reference
-  # track, no queue - analysis is cheap enough to run inline in a small pool.
+  # track; analyses run under a sample budget (see SampleBudget in main.py) and
+  # a short, bounded line waits behind them. One 5-minute 48 kHz analysis peaks
+  # around 2.1 GB, hence the memory limit.
   analyzer:
+    <<: *hardened
     build: ./analyzer
     container_name: dp_analyzer
     environment:
+      GATEWAY_SECRET: ${GATEWAY_SECRET:?set GATEWAY_SECRET in .env}
       UPLOAD_DIR: /data/uploads
       MAX_UPLOAD_MB: ${ANALYZER_MAX_UPLOAD_MB:-40}
       MAX_DURATION_SECONDS: ${ANALYZER_MAX_DURATION_SECONDS:-300}
     volumes:
       - analyzer-uploads:/data/uploads
+    tmpfs:
+      - /tmp:size=256m
     deploy:
       resources:
         limits:
           cpus: "2"
-          memory: 1536m
+          memory: 2560m
     restart: unless-stopped
 
   # Photo background removal (rembg, ONNX/CPU). At most 2 users' images are
@@ -125,9 +200,11 @@ services:
   # so onnxruntime doesn't spawn more threads than there are real cores to run
   # them on.
   bgremove:
+    <<: *hardened
     build: ./bgremove
     container_name: dp_bgremove
     environment:
+      GATEWAY_SECRET: ${GATEWAY_SECRET:?set GATEWAY_SECRET in .env}
       REMBG_MODEL: ${BGREMOVE_MODEL:-isnet-general-use}
       MAX_FILE_SIZE_MB: ${BGREMOVE_MAX_UPLOAD_MB:-15}
       MAX_IMAGE_PIXELS: ${BGREMOVE_MAX_IMAGE_PIXELS:-25000000}
@@ -136,6 +213,8 @@ services:
       OMP_NUM_THREADS: "2"
     volumes:
       - bgremove-models:/models
+    tmpfs:
+      - /tmp:size=256m
     deploy:
       resources:
         limits:
@@ -144,8 +223,15 @@ services:
     restart: unless-stopped
 
   tags:
+    <<: *hardened
     build: ./tags
     container_name: dp_tags
+    environment:
+      MAX_AUDIO_MB: ${TAGS_MAX_UPLOAD_MB:-100}
+    volumes:
+      # Uploads and the edited copy live in /tmp; disk-backed so a 100 MB file
+      # doesn't sit in the container's memory.
+      - tags-tmp:/tmp
     deploy:
       resources:
         limits:
@@ -154,6 +240,7 @@ services:
     restart: unless-stopped
 
   gateway:
+    <<: *hardened
     build: ./gateway
     container_name: dp_gateway
     deploy:
@@ -162,9 +249,18 @@ services:
           cpus: "1.5"
           memory: 512m
     environment:
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      GATEWAY_SECRET: ${GATEWAY_SECRET:?set GATEWAY_SECRET in .env}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-dp_session}
+      # "true" behind Cloudflare (header only trusted from Cloudflare edge IPs).
+      TRUST_CF_CONNECTING_IP: ${TRUST_CF_CONNECTING_IP:-false}
       ACCOUNTS_URL: http://accounts:4100
+      # Upload caps, so oversized bodies are refused before reaching a tool.
+      BEATS_MAX_UPLOAD_MB: ${BEATS_MAX_UPLOAD_MB:-200}
+      TRANSCRIBE_MAX_UPLOAD_MB: ${TRANSCRIBE_MAX_UPLOAD_MB:-25}
+      ANALYZER_MAX_UPLOAD_MB: ${ANALYZER_MAX_UPLOAD_MB:-40}
+      BGREMOVE_MAX_UPLOAD_MB: ${BGREMOVE_MAX_UPLOAD_MB:-15}
+      TAGS_MAX_UPLOAD_MB: ${TAGS_MAX_UPLOAD_MB:-100}
       # A tool becomes available (and gets a live hub tile) only when its URL is
       # set here. Comment a line out to show that tool as "Soon" instead.
       PHOTO_URL: http://photo:80
@@ -179,6 +275,11 @@ services:
       - ./shared:/app/shared:ro
       - ./public:/app/pubassets:ro
       - ./feedback:/app/feedback
+    tmpfs:
+      - /tmp:size=16m
+    networks:
+      - default
+      - auth
     depends_on:
       - accounts
       - photo
@@ -193,10 +294,19 @@ services:
       - "${GATEWAY_PORT:-4000}:4000"
     restart: unless-stopped
 
+networks:
+  default: {}
+  auth:
+    internal: true
+  data:
+    internal: true
+
 volumes:
   db-data:
   beats-storage:
   beats-db:
+  beats-tmp:
   transcribe-work:
   analyzer-uploads:
   bgremove-models:
+  tags-tmp:

@@ -252,7 +252,7 @@
     const fd = new FormData();
     fd.append('file', file);
 
-    fetch('/api/read', { method: 'POST', body: fd })
+    fetch('api/read', { method: 'POST', body: fd })
       .then(async (res) => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({ detail: 'Failed to read audio' }));
@@ -341,7 +341,7 @@
     fd.append('copyright', document.getElementById('inpCopyright').value);
     fd.append('comment', document.getElementById('inpComment').value);
 
-    fetch('/api/save', { method: 'POST', body: fd })
+    fetch('api/save', { method: 'POST', body: fd })
       .then(async (res) => {
         if (!res.ok) {
           const err = await res.json().catch(() => ({ detail: 'Save failed' }));

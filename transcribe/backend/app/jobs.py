@@ -36,7 +36,19 @@ JOB_TIMEOUT_SECONDS = 180   # generous vs. the 60s max clip length + model overh
 _MP_CONTEXT = multiprocessing.get_context("spawn")
 
 
+class QueueFull(RuntimeError):
+    pass
+
+
+class TooManyJobs(RuntimeError):
+    MESSAGE = "You already have transcriptions in progress. Please wait for them to finish."
+
+
 class JobManager:
+    # Queued + running jobs one user may have at once, so a single account
+    # can't fill the shared queue and lock everyone else out.
+    MAX_ACTIVE_PER_USER = 2
+
     def __init__(self, work_dir: str):
         self.work_dir = work_dir
         os.makedirs(work_dir, exist_ok=True)
@@ -72,11 +84,24 @@ class JobManager:
         with self._lock:
             return len(self._order)
 
-    def submit(self, user_id, in_path, tempo, quantize, filename) -> str:
-        """Enqueue a transcription. Raises RuntimeError if the backlog is full."""
+    def active_jobs(self, user_id) -> int:
         with self._lock:
+            return self._active_jobs_locked(user_id)
+
+    def _active_jobs_locked(self, user_id) -> int:
+        return sum(
+            1 for rec in self._jobs.values()
+            if rec["user_id"] == user_id and rec["status"] in ("queued", "processing")
+        )
+
+    def submit(self, user_id, in_path, tempo, quantize, filename) -> str:
+        """Enqueue a transcription. Raises TooManyJobs if this user already has
+        the maximum in flight, QueueFull if the shared backlog is full."""
+        with self._lock:
+            if self._active_jobs_locked(user_id) >= self.MAX_ACTIVE_PER_USER:
+                raise TooManyJobs(TooManyJobs.MESSAGE)
             if len(self._order) >= MAX_QUEUE:
-                raise RuntimeError("The queue is full right now. Please try again in a moment.")
+                raise QueueFull("The queue is full right now. Please try again in a moment.")
             job_id = uuid.uuid4().hex
             self._jobs[job_id] = {
                 "id": job_id,

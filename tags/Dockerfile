@@ -1,6 +1,8 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
@@ -9,11 +11,11 @@ RUN apt-get update \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Code stays root-owned: the runtime user must never be able to rewrite the
+# app or its HTML. Uploads only ever go to the temp directory.
 COPY backend/app ./app
 
-RUN useradd --create-home --uid 1000 appuser \
-    && mkdir -p /data/temp \
-    && chown -R appuser:appuser /app /data
+RUN useradd --create-home --uid 1000 appuser
 USER appuser
 
 EXPOSE 8000

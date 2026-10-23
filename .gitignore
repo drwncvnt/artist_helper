@@ -19,3 +19,6 @@ data/
 # User-submitted feedback/bug reports (real user data, not sample content)
 /feedback/*
 !/feedback/.gitkeep
+
+# Test caches
+.pytest_cache/

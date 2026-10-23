@@ -1,23 +1,27 @@
 """Identity for the beats tool.
 
-This service no longer authenticates users itself. The platform gateway verifies
-the shared session and, for every proxied request, injects two trusted headers:
+This service does not authenticate users itself. The platform gateway verifies
+the shared session and, for every proxied request, injects three trusted
+headers:
 
-    X-Auth-User-Id    the platform user id
-    X-Auth-Username   the platform username
+    X-Auth-User-Id     the platform user id
+    X-Auth-Username    the platform username
+    X-Gateway-Secret   a secret shared only between the gateway and this tool
 
-Because the beats backend is only reachable through the gateway on the internal
-network (never published to the host), those headers are trusted. The gateway
-strips any client-supplied X-Auth-* headers before setting its own, so they
-cannot be spoofed by a browser.
+The gateway strips any client-supplied copies before setting its own, so a
+browser cannot spoof them. The secret additionally proves the request came
+from the gateway rather than from some other container on the network.
 
 The user is mirrored into the local database on each request so that track
 ownership (uploader) keeps working with the existing schema.
 """
 
-from fastapi import Header, HTTPException, status
+import hmac
+
+from fastapi import Depends, Header, HTTPException, status
 
 from . import db
+from .config import settings
 
 
 class CurrentUser:
@@ -26,23 +30,30 @@ class CurrentUser:
         self.username = username
 
 
-async def require_session(
+def _from_gateway(secret: str | None) -> bool:
+    if not secret:
+        return False
+    return hmac.compare_digest(secret.encode(), settings.gateway_secret.encode())
+
+
+def optional_session(
     x_auth_user_id: str | None = Header(default=None),
     x_auth_username: str | None = Header(default=None),
-) -> CurrentUser:
-    if not x_auth_user_id or not x_auth_username:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    x_gateway_secret: str | None = Header(default=None),
+) -> CurrentUser | None:
+    """The signed-in user, or None for anonymous requests (e.g. a share link
+    opened by someone without an account)."""
+    if not _from_gateway(x_gateway_secret) or not x_auth_user_id or not x_auth_username:
+        return None
     try:
-        user_id = int(x_auth_user_id)
+        return CurrentUser(id=int(x_auth_user_id), username=x_auth_username)
     except ValueError:
+        return None
+
+
+def require_session(user: CurrentUser | None = Depends(optional_session)) -> CurrentUser:
+    if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-
     # Keep a local mirror of the platform account so uploader joins resolve.
-    db.upsert_user(user_id, x_auth_username)
-    return CurrentUser(id=user_id, username=x_auth_username)
-
-
-def header_identity_present(x_auth_user_id: str | None) -> bool:
-    """Cheap check used by the streaming endpoint (which the gateway has already
-    gated) to accept an authenticated request without a signed token."""
-    return bool(x_auth_user_id)
+    db.upsert_user(user.id, user.username)
+    return user

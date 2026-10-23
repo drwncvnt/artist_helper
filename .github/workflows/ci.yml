@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: Node (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [gateway, accounts, beats/frontend]
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: ${{ matrix.dir }}/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Tests
+        if: matrix.dir == 'gateway'
+        run: npm test
+      - name: Syntax check
+        if: matrix.dir != 'beats/frontend'
+        run: for f in *.js; do node --check "$f"; done
+      - name: Build
+        if: matrix.dir == 'beats/frontend'
+        run: npm run build
+      # GHSA-vfj7-8cjw-p6xm (braces, via http-proxy-middleware -> micromatch)
+      # has no fixed release. It is only reachable through glob patterns in
+      # the proxy config, and the gateway uses function path filters only.
+      - name: Dependency audit
+        run: npx --yes audit-ci@7 --high --allowlist GHSA-vfj7-8cjw-p6xm
+
+  python-tests:
+    name: Python tests (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: beats
+            python: "3.12"
+          - service: tags
+            python: "3.11"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -r ${{ matrix.service }}/backend/requirements.txt pytest httpx
+      - run: python -m pytest -q ${{ matrix.service }}/tests
+
+  python-audit:
+    name: Python dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - name: Syntax check
+        run: python -m compileall -q analyzer beats bgremove midi promo tags transcribe
+      - name: Audit pinned requirements
+        run: |
+          status=0
+          for req in */requirements.txt */backend/requirements.txt; do
+            echo "::group::$req"
+            pip-audit --no-deps --disable-pip -r "$req" || status=1
+            echo "::endgroup::"
+          done
+          exit $status

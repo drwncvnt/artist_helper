@@ -8,14 +8,16 @@ The web process stays light — it validates uploads and tracks jobs, while the
 actual model runs in separate worker processes.
 """
 
+import hmac
 import os
 import subprocess
 import uuid
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 
-from .jobs import JobManager
+from .jobs import JobManager, QueueFull, TooManyJobs
 
 STATIC_DIR = os.path.dirname(__file__)
 WORK_DIR = os.environ.get("WORK_DIR", "/data/work")
@@ -25,16 +27,24 @@ MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "25"))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 MAX_DURATION_SECONDS = int(os.environ.get("MAX_DURATION_SECONDS", "60"))
 ALLOWED_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac"}
+GATEWAY_SECRET = os.environ.get("GATEWAY_SECRET", "")
 
 app = FastAPI(title="transcribe API")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 manager = JobManager(WORK_DIR)
 
 
-def current_user_id(x_auth_user_id: str | None = Header(default=None)) -> str:
-    """Identity injected by the gateway. This service is only reachable through
-    the gateway, which strips any client-supplied copy of this header."""
-    if not x_auth_user_id:
+def current_user_id(
+    x_auth_user_id: str | None = Header(default=None),
+    x_gateway_secret: str | None = Header(default=None),
+) -> str:
+    """Identity injected by the gateway. The shared secret proves the request
+    came through the gateway (which strips client-supplied copies of these
+    headers) rather than from another container on the network."""
+    from_gateway = bool(GATEWAY_SECRET) and bool(x_gateway_secret) and hmac.compare_digest(
+        x_gateway_secret.encode(), GATEWAY_SECRET.encode()
+    )
+    if not from_gateway or not x_auth_user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     return x_auth_user_id
 
@@ -78,6 +88,10 @@ async def analyze_upload(
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="Tempo must be a number.")
     quantize_val = str(quantize).lower() in ("1", "true", "on", "yes")
+    # Checked before the upload is stored, then enforced again atomically in
+    # submit() below.
+    if manager.active_jobs(user_id) >= JobManager.MAX_ACTIVE_PER_USER:
+        raise HTTPException(status_code=429, detail=TooManyJobs.MESSAGE)
 
     # Stream the upload to disk with a hard size cap.
     in_path = os.path.join(UPLOAD_DIR, uuid.uuid4().hex + ext)
@@ -100,7 +114,7 @@ async def analyze_upload(
         _silent_unlink(in_path)
         raise HTTPException(status_code=400, detail="Could not read the uploaded file.")
 
-    duration = _probe_duration(in_path)
+    duration = await run_in_threadpool(_probe_duration, in_path)
     if duration is None:
         _silent_unlink(in_path)
         raise HTTPException(status_code=400, detail="That doesn't look like a readable audio file.")
@@ -113,7 +127,10 @@ async def analyze_upload(
 
     try:
         job_id = manager.submit(user_id, in_path, tempo_val, quantize_val, file.filename or "audio")
-    except RuntimeError as exc:
+    except TooManyJobs as exc:
+        _silent_unlink(in_path)
+        raise HTTPException(status_code=429, detail=str(exc))
+    except QueueFull as exc:
         _silent_unlink(in_path)
         raise HTTPException(status_code=503, detail=str(exc))
 

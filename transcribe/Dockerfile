@@ -1,6 +1,12 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+# The container filesystem is read-only at runtime; JIT and plotting caches
+# go to the /tmp tmpfs instead of next to the installed packages.
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    NUMBA_CACHE_DIR=/tmp/numba-cache \
+    MPLCONFIGDIR=/tmp/matplotlib
 
 # ffmpeg -> ffprobe (duration checks) + mp3/m4a decoding; libsndfile1 -> soundfile.
 RUN apt-get update \
@@ -14,7 +20,7 @@ COPY backend/app ./app
 
 RUN useradd --create-home --uid 1000 appuser \
     && mkdir -p /data/work \
-    && chown -R appuser:appuser /app /data
+    && chown -R appuser:appuser /data
 USER appuser
 
 EXPOSE 8000

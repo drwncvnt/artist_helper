@@ -3,7 +3,7 @@ import * as api from './api.js';
 import NowPlayingBar from './NowPlayingBar.jsx';
 import TrackCard from './TrackCard.jsx';
 import { useToast } from './Toast.jsx';
-import { analyzeAudioFile } from './utils.js';
+import { analyzeAudioFile, formatSize } from './utils.js';
 import { useAudioEngine } from './useAudioEngine.js';
 
 function UploadPanel({ onUpload, progress }) {
@@ -86,6 +86,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [tracks, setTracks] = useState([]);
+  const [quota, setQuota] = useState(null);
   const [current, setCurrent] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(null);
@@ -102,8 +103,9 @@ function App() {
 
   async function refreshTracks() {
     try {
-      const { tracks } = await api.listTracks();
+      const { tracks, quota } = await api.listTracks();
       setTracks(tracks);
+      setQuota(quota || null);
     } catch {
       window.location.href = '/login';
     }
@@ -133,6 +135,32 @@ function App() {
       audioRef.current.play().catch(() => toast('Playback was blocked - try again', 'error'));
     }
   }, [current]);
+
+  async function handleToggleVisibility(track) {
+    try {
+      await api.setVisibility(track.id, !track.is_public);
+      toast(track.is_public ? 'Track is now private' : 'Track is now public', 'success');
+      await refreshTracks();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  async function handleDelete(track) {
+    const name = track.title || track.id;
+    if (!window.confirm(`Delete "${name}"? Share links to it will stop working. This cannot be undone.`)) return;
+    try {
+      await api.deleteTrack(track.id);
+      if (current?.id === track.id) {
+        audioRef.current.pause();
+        setCurrent(null);
+      }
+      toast('Track deleted', 'success');
+      await refreshTracks();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
 
   async function handleUpload(file, meta) {
     setUploadProgress(0);
@@ -178,6 +206,11 @@ function App() {
 
         <section className="groupbox library">
           <div className="groupbox-title">Library</div>
+          {quota && (
+            <p className="hint quota-line">
+              Your storage: {formatSize(quota.used_bytes)} of {formatSize(quota.limit_bytes)} used
+            </p>
+          )}
           {tracks.length === 0 ? (
             <p className="hint" style={{ padding: '8px 2px' }}>
               No tracks yet. Add a demo, beat or instrumental above - keep it private, or
@@ -192,6 +225,8 @@ function App() {
                   isCurrent={current?.id === t.id}
                   isPlaying={current?.id === t.id && isPlaying}
                   onPlay={playTrack}
+                  onToggleVisibility={handleToggleVisibility}
+                  onDelete={handleDelete}
                   getLevels={current?.id === t.id ? getLevels : null}
                 />
               ))}

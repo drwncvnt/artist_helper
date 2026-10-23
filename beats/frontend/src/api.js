@@ -55,6 +55,22 @@ export function uploadTrack(file, { duration, waveform, title, description, isPu
   });
 }
 
+function sendJson(path, method, body) {
+  return request(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+export function setVisibility(trackId, isPublic) {
+  return sendJson(`/tracks/${encodeURIComponent(trackId)}`, 'PATCH', { is_public: isPublic });
+}
+
+export function deleteTrack(trackId) {
+  return sendJson(`/tracks/${encodeURIComponent(trackId)}`, 'DELETE');
+}
+
 export function streamUrl(trackId) {
   return `${BASE}/stream/${encodeURIComponent(trackId)}`;
 }

@@ -1,14 +1,16 @@
 # Stage 1 - build the React SPA (Vite), base path /beats/.
-FROM node:20-slim AS frontend
+FROM node:24-slim AS frontend
 WORKDIR /fe
-COPY frontend/package.json ./
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
 # Stage 2 - Python backend that serves both the API and the built SPA.
 FROM python:3.12-slim
 WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
@@ -20,9 +22,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/app ./app
 COPY --from=frontend /fe/dist ./static
 
+# Only the data directories belong to the runtime user; the code stays
+# root-owned so a bug in the app can never rewrite the app itself.
 RUN useradd --create-home --uid 1000 appuser \
     && mkdir -p /data/storage /data/db \
-    && chown -R appuser:appuser /app /data
+    && chown -R appuser:appuser /data
 USER appuser
 
 EXPOSE 8000

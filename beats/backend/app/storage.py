@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import uuid
 from pathlib import Path
 
@@ -25,14 +26,34 @@ def sanitize_filename(original_name: str) -> str:
     return f"{uuid.uuid4().hex[:8]}-{stem}{ext}"
 
 
-def resolve_track_path(track_id: str) -> Path:
-    """Resolves a track id to a path, guaranteed to stay within STORAGE_ROOT."""
+def _path_for(track_id: str) -> Path:
+    """Maps a track id to its file path, guaranteed to stay within STORAGE_ROOT."""
     candidate = (STORAGE_ROOT / os.path.basename(track_id)).resolve()
-    if STORAGE_ROOT not in candidate.parents and candidate != STORAGE_ROOT:
+    if STORAGE_ROOT not in candidate.parents:
         raise HTTPException(status_code=400, detail="Invalid track id")
+    return candidate
+
+
+def resolve_track_path(track_id: str) -> Path:
+    candidate = _path_for(track_id)
     if not candidate.is_file():
         raise HTTPException(status_code=404, detail="Track not found")
     return candidate
+
+
+def delete_track_file(track_id: str) -> None:
+    _path_for(track_id).unlink(missing_ok=True)
+
+
+def file_size(track_id: str) -> int | None:
+    try:
+        return _path_for(track_id).stat().st_size
+    except (OSError, HTTPException):
+        return None
+
+
+def free_disk_bytes() -> int:
+    return shutil.disk_usage(STORAGE_ROOT).free
 
 
 def list_tracks() -> list[dict]:
@@ -97,12 +118,9 @@ def stream_track(path: Path, range_header: str | None) -> StreamingResponse:
     )
 
 
-async def save_upload(file, declared_size: int | None) -> str:
+async def save_upload(file) -> str:
     filename = sanitize_filename(file.filename or "track")
     dest = STORAGE_ROOT / filename
-
-    if declared_size is not None and declared_size > settings.max_upload_bytes:
-        raise HTTPException(status_code=413, detail="File too large")
 
     written = 0
     chunk_size = 1024 * 256

@@ -11,7 +11,7 @@ if (!SECRET) {
 const COOKIE_NAME = process.env.SESSION_COOKIE_NAME || 'dp_session';
 
 function verify(token) {
-  return jwt.verify(token, SECRET);
+  return jwt.verify(token, SECRET, { algorithms: ['HS256'] });
 }
 
 module.exports = { verify, COOKIE_NAME };

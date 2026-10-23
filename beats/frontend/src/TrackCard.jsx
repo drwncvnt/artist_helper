@@ -4,7 +4,7 @@ import { useToast } from './Toast.jsx';
 import Waveform from './Waveform.jsx';
 import { avatarColor, formatDuration, formatSize, initials } from './utils.js';
 
-export default function TrackCard({ track, isPlaying, isCurrent, onPlay, getLevels }) {
+export default function TrackCard({ track, isPlaying, isCurrent, onPlay, onToggleVisibility, onDelete, getLevels }) {
   const [copied, setCopied] = useState(false);
   const toast = useToast();
 
@@ -69,7 +69,23 @@ export default function TrackCard({ track, isPlaying, isCurrent, onPlay, getLeve
         </div>
       </div>
 
-      <button className="btn small share-btn" onClick={share}>{copied ? 'Copied' : 'Share'}</button>
+      <div className="track-actions">
+        <button className="btn small share-btn" onClick={share}>{copied ? 'Copied' : 'Share'}</button>
+        {track.mine && (
+          <>
+            <button
+              className="btn small"
+              onClick={(e) => { e.stopPropagation(); onToggleVisibility(track); }}
+              title={track.is_public ? 'Hide from other users' : 'Show in everyone\'s library'}
+            >
+              {track.is_public ? 'Make private' : 'Make public'}
+            </button>
+            <button className="btn small" onClick={(e) => { e.stopPropagation(); onDelete(track); }}>
+              Delete
+            </button>
+          </>
+        )}
+      </div>
     </li>
   );
 }
