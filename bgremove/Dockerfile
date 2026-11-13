@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 # NUMBA_CACHE_DIR: pymatting JIT-compiles with numba, and the container
 # filesystem is read-only at runtime, so its cache lives on the /tmp tmpfs.
